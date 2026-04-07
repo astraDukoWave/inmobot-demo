@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InmoBot - Asistente Inmobiliario IA</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .landing {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 60px;
+            text-align: center;
+        }
+
+        .landing h1 {
+            color: #2C5F8A;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+
+        .landing p {
+            color: #666;
+            font-size: 1.2em;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .landing .cta-button {
+            background: #2C5F8A;
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 1.1em;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(44, 95, 138, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .landing .cta-button:hover {
+            background: #1e4464;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(44, 95, 138, 0.4);
+        }
+
+        .landing .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-top: 50px;
+        }
+
+        .landing .feature {
+            text-align: center;
+        }
+
+        .landing .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .landing .feature h3 {
+            color: #2C5F8A;
+            margin-bottom: 10px;
+        }
+
+        .landing .feature p {
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        /* Chat widget styles */
+        #chat-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 70px;
+            height: 70px;
+            background: #2C5F8A;
+            border-radius: 50%;
+            box-shadow: 0 6px 20px rgba(44, 95, 138, 0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            color: white;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        #chat-button:hover {
+            background: #1e4464;
+            transform: scale(1.1);
+        }
+
+        #chat-window {
+            position: fixed;
+            bottom: 120px;
+            right: 30px;
+            width: 400px;
+            height: 600px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            display: none;
+            flex-direction: column;
+            z-index: 999;
+            overflow: hidden;
+        }
+
+        #chat-window.open {
+            display: flex;
+        }
+
+        #chat-header {
+            background: linear-gradient(135deg, #2C5F8A 0%, #1e4464 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        #chat-header .logo {
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            color: #2C5F8A;
+        }
+
+        #chat-header .info h3 {
+            margin: 0;
+            font-size: 1.1em;
+        }
+
+        #chat-header .info p {
+            margin: 0;
+            font-size: 0.85em;
+            opacity: 0.9;
+        }
+
+        #chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #F5F5F5;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message-content {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            font-size: 0.95em;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .message.bot .message-content {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .message.user .message-content {
+            background: #2C5F8A;
+            color: white;
+        }
+
+        .property-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 320px;
+        }
+
+        .property-card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        .property-card .property-info {
+            padding: 15px;
+        }
+
+        .property-card h4 {
+            margin: 0 0 8px 0;
+            color: #2C5F8A;
+            font-size: 1.05em;
+        }
+
+        .property-card .price {
+            font-size: 1.3em;
+            color: #1e4464;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .property-card .details {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: white;
+            border-radius: 18px;
+            max-width: 75px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .typing-indicator.active {
+            display: inline-block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
+
+        #chat-input-area {
+            padding: 15px;
+            background: white;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 0.95em;
+        }
+
+        #chat-input:focus {
+            border-color: #2C5F8A;
+        }
+
+        #send-button {
+            background: #2C5F8A;
+            color: white;
+            border: none;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        #send-button:hover {
+            background: #1e4464;
+            transform: scale(1.1);
+        }
+
+        @media (max-width: 768px) {
+            .landing {
+                padding: 30px;
+            }
+
+            #chat-window {
+                right: 10px;
+                bottom: 100px;
+                width: calc(100vw - 20px);
+                max-width: 400px;
+            }
+
+            #chat-button {
+                right: 15px;
+                bottom: 15px;
+                width: 60px;
+                height: 60px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="landing">
+        <h1>🏡 InmoBot - Tu Asistente Inmobiliario Inteligente</h1>
+        <p>Encuentra tu propiedad ideal en Puebla con ayuda de inteligencia artificial. 
+Atención 24/7, respuestas instantáneas y propiedades personalizadas para ti.</p>
+        <button class="cta-button" onclick="openChat()">💬 Hablar con Sofía</button>
+
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3>Respuesta Inmediata</h3>
+                <p>Atención 24/7 sin esperas</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🏙️</div>
+                <h3>Propiedades Reales</h3>
+                <p>Catálogo actualizado de Puebla</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📅</div>
+                <h3>Agenda Visitas</h3>
+                <p>Programa tu recorrido al instante</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Widget -->
+    <div id="chat-button" onclick="toggleChat()">
+        💬
+    </div>
+
+    <div id="chat-window">
+        <div id="chat-header">
+            <div class="logo">🏡</div>
+            <div class="info">
+                <h3>Sofía - InmoBot</h3>
+                <p>Asesora Inmobiliaria Virtual</p>
+            </div>
+        </div>
+        <div id="chat-messages">
+            <div class="message bot">
+                <div class="message-content">
+                    👋 ¡Hola! Soy Sofía, tu asesora inmobiliaria virtual. Estoy aquí para ayudarte a encontrar la propiedad perfecta en Puebla. ¿Qué estás buscando?
+                </div>
+            </div>
+            <div class="typing-indicator" id="typing-indicator">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div id="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Escribe tu mensaje..." onkeypress="handleKeyPress(event)">
+            <button id="send-button" onclick="sendMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let sessionId = localStorage.getItem('inmobot_session') || 'session_' + Date.now();
+        localStorage.setItem('inmobot_session', sessionId);
+
+        function toggleChat() {
+            const chatWindow = document.getElementById('chat-window');
+            chatWindow.classList.toggle('open');
+            if (chatWindow.classList.contains('open')) {
+                document.getElementById('chat-input').focus();
+            }
+        }
+
+        function openChat() {
+            document.getElementById('chat-window').classList.add('open');
+            document.getElementById('chat-input').focus();
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function addMessage(content, isUser = false, properties = []) {
+            const messagesDiv = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'bot'}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content.replace(/\n/g, '<br>');
+            messageDiv.appendChild(contentDiv);
+            
+            const typingIndicator = document.getElementById('typing-indicator');
+            messagesDiv.insertBefore(messageDiv, typingIndicator);
+            
+            if (properties && properties.length > 0) {
+                properties.forEach(prop => {
+                    const card = document.createElement('div');
+                    card.className = 'property-card';
+                    card.innerHTML = `
+                        <img src="${prop.image_url}" alt="${prop.name}">
+                        <div class="property-info">
+                            <h4>${prop.name}</h4>
+                            <div class="price">$${prop.price_mxn.toLocaleString('es-MX')} MXN</div>
+                            <div class="details">📍 ${prop.zone}</div>
+                            <div class="details">🛌 ${prop.bedrooms} recámaras | 🚿 ${prop.bathrooms} baños</div>
+                            <div class="details">📏 ${prop.area_m2} m²</div>
+                        </div>
+                    `;
+                    messagesDiv.insertBefore(card, typingIndicator);
+                });
+            }
+            
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            addMessage(message, true);
+            input.value = '';
+            
+            const typingIndicator = document.getElementById('typing-indicator');
+            typingIndicator.classList.add('active');
+            
+            try {
+                const response = await fetch(`${API_URL}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        message: message
+                    })
+                });
+                
+                const data = await response.json();
+                
+                typingIndicator.classList.remove('active');
+                addMessage(data.reply, false, data.properties || []);
+                
+            } catch (error) {
+                typingIndicator.classList.remove('active');
+                addMessage('Lo siento, hubo un error. Por favor intenta nuevamente.', false);
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
