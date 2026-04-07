@@ -90,23 +90,23 @@ def extract_intent(session_history: list) -> dict:
     extraction_prompt = [
         {"role": "system", "content": (
             "Analiza la conversacion y extrae los criterios de busqueda inmobiliaria. "
-            "Responde UNICAMENTE con JSON valido con estos campos (usa null si no se menciona): "
+            "Responde unicamente con un objeto JSON valido (sin markdown ni texto fuera del JSON). "
+            "Los campos deben ser exactamente estos (usa null si no se menciona): "
             '{"budget_min": int|null, "budget_max": int|null, "zone": str|null, '
             '"bedrooms": int|null, "prop_type": str|null, "name": str|null, '
             '"phone": str|null, "purchase_type": str|null, "timeline": str|null}'
         )}
     ] + session_history
-    
+
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=extraction_prompt,
         temperature=0,
         max_tokens=200,
+        response_format={"type": "json_object"},
     )
     try:
-        raw = resp.choices[0].message.content.strip()
-        raw = re.sub(r"```json|```", "", raw).strip()
-        return json.loads(raw)
+        return json.loads(resp.choices[0].message.content)
     except Exception:
         return {}
 
