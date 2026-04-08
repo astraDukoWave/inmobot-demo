@@ -205,6 +205,8 @@ async def chat(req: ChatRequest):
     )
     
     assistant_msg = response.choices[0].message.content
+    if matched_props and "[SHOW_PROPERTIES]" not in assistant_msg:
+        assistant_msg = assistant_msg.rstrip() + " [SHOW_PROPERTIES]"
     history.append({"role": "assistant", "content": assistant_msg})
     
     # Check for lead capture
