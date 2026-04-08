@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -70,21 +71,33 @@ class ChatResponse(BaseModel):
     properties: list = []
     lead_saved: bool = False
 
+def normalize_text(text: str) -> str:
+    return (
+        unicodedata.normalize("NFKD", text)
+        .encode("ASCII", "ignore")
+        .decode("utf-8")
+        .lower()
+    )
+
 # --- Filter properties in Python (no LLM hallucinations) ---
 def filter_properties(budget_min: Optional[int], budget_max: Optional[int],
                       zone: Optional[str], bedrooms: Optional[int],
                       prop_type: Optional[str]) -> list:
+    if budget_min is not None and budget_min < 100:
+        budget_min = budget_min * 1_000_000
+    if budget_max is not None and budget_max < 100:
+        budget_max = budget_max * 1_000_000
     results = []
     for p in PROPERTIES:
         if budget_min and p["price_mxn"] < budget_min:
             continue
         if budget_max and p["price_mxn"] > budget_max:
             continue
-        if zone and zone.lower() not in p["zone"].lower():
+        if zone and normalize_text(zone) not in normalize_text(p["zone"]):
             continue
         if bedrooms and p["bedrooms"] < bedrooms:
             continue
-        if prop_type and prop_type.lower() not in p["type"].lower():
+        if prop_type and normalize_text(prop_type) not in normalize_text(p["type"]):
             continue
         results.append(p)
     return results[:3]  # max 3 results
@@ -94,6 +107,8 @@ def extract_intent(session_history: list) -> dict:
     extraction_prompt = [
         {"role": "system", "content": (
             "Analiza la conversacion y extrae los criterios de busqueda inmobiliaria. "
+            "budget_max y budget_min DEBEN ser números completos (ej. 3000000). "
+            "prop_type debe ser 'casa' o 'departamento' (usa null si dice algo general como 'propiedad'). "
             "Responde UNICAMENTE con JSON valido con estos campos (usa null si no se menciona): "
             '{"budget_min": int|null, "budget_max": int|null, "zone": str|null, '
             '"bedrooms": int|null, "prop_type": str|null, "name": str|null, '
@@ -106,12 +121,11 @@ def extract_intent(session_history: list) -> dict:
         messages=extraction_prompt,
         temperature=0,
         max_tokens=200,
+        response_format={"type": "json_object"},
     )
     try:
-        raw = resp.choices[0].message.content.strip()
-        raw = re.sub(r"```json|```", "", raw).strip()
-        return json.loads(raw)
-    except Exception:
+        return json.loads(resp.choices[0].message.content)
+    except (json.JSONDecodeError, TypeError):
         return {}
 
 # --- Save lead to DB ---
