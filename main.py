@@ -87,6 +87,8 @@ def filter_properties(budget_min: Optional[int], budget_max: Optional[int],
         budget_min = budget_min * 1_000_000
     if budget_max is not None and budget_max < 100:
         budget_max = budget_max * 1_000_000
+    if budget_min and budget_max and budget_min >= budget_max:
+        budget_min = None
     results = []
     for p in PROPERTIES:
         if budget_min and p["price_mxn"] < budget_min:
@@ -108,6 +110,7 @@ def extract_intent(session_history: list) -> dict:
         {"role": "system", "content": (
             "Analiza la conversacion y extrae los criterios de busqueda inmobiliaria. "
             "budget_max y budget_min DEBEN ser números completos (ej. 3000000). "
+            "Si el usuario menciona un solo monto de presupuesto (ej. '3 millones'), asígnalo SIEMPRE a 'budget_max' y deja 'budget_min' en null. "
             "prop_type debe ser 'casa' o 'departamento' (usa null si dice algo general como 'propiedad'). "
             "Responde UNICAMENTE con JSON valido con estos campos (usa null si no se menciona): "
             '{"budget_min": int|null, "budget_max": int|null, "zone": str|null, '
