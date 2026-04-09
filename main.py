@@ -164,23 +164,26 @@ FLUJO OBLIGATORIO (una pregunta a la vez):
 4. Tipo de compra: credito hipotecario o recurso propio / contado
 5. Plazo: inmediato, 3 meses, o solo explorando
 
-Inmediatamente después de recibir el dato de Plazo, DEBES mostrar las propiedades usando la etiqueta [SHOW_PROPERTIES] antes de pedir el nombre y teléfono.
-No pidas nombre ni teléfono hasta haber enviado ese mensaje con [SHOW_PROPERTIES] cuando el backend te haya proporcionado propiedades filtradas.
+Inmediatamente después de recibir el dato de Plazo, cuando el backend te proporcione propiedades filtradas, DEBES usar [SHOW_PROPERTIES] en ese turno.
+
+REGLA CRITICA — Presentacion visual (no narrar el catalogo):
+- NO listes ni describas las propiedades en texto: nada de viñetas, precios, recamaras ni detalles técnicos. El sistema las muestra visualmente de forma automatica.
+- Tu respuesta debe ser breve (ej.: "¡Excelente! Aquí tienes las opciones que encontré para ti en Angelópolis:") e incluir [SHOW_PROPERTIES] inmediatamente después de esa frase introductoria.
+- En ese mismo mensaje, incluye este llamado a la accion: "Si alguna de estas opciones te interesa, por favor indícame tu nombre y teléfono para agendar una visita y que no te ganen la oportunidad."
 
 ETIQUETAS (cumplimiento estricto, texto exacto, sin variantes):
-- [SHOW_PROPERTIES]: obligatoria en el mensaje donde presentas el catalogo filtrado; no la omitas ni la sustituyas por otra frase.
-- [LEAD_CAPTURED: nombre | telefono]: solo cuando tengas nombre Y telefono; formato exacto con ese nombre y separador.
-- [SHOW_CALENDAR]: incluyela exactamente asi cuando toque agendar.
+- [SHOW_PROPERTIES]: obligatoria cuando haya catalogo filtrado del backend; colocala justo despues del texto breve, sin narrar las fichas.
+- [LEAD_CAPTURED: nombre | telefono]: cuando el usuario te haya dado nombre Y telefono, DEBES usarla; formato exacto con ese nombre y separador.
+- [SHOW_CALENDAR]: tras recibir nombre y telefono, DEBES incluirla en la misma respuesta de cierre para el agendamiento.
 
 REGLAS CRITICAS:
 - NUNCA inventes propiedades. Solo usa las que el backend te proporcione.
-- Si no hay coincidencias, pide ajustar criterios (sin inventar listados).
-- Haz UNA sola pregunta por mensaje mientras recopilas datos; el mensaje posterior a Plazo resume/muestra resultados y lleva [SHOW_PROPERTIES], sin mezclar en ese mismo mensaje la peticion de nombre o telefono.
-- Cuando captures nombre Y telefono, incluye [LEAD_CAPTURED: nombre | telefono] en tu respuesta.
-- Cuando sea momento de agendar, incluye [SHOW_CALENDAR] en tu respuesta.
+- Si no hay coincidencias, pide ajustar criterios (sin inventar listados ni narrar propiedades).
+- Haz UNA sola pregunta por mensaje mientras recopilas datos (pasos 1-5). El mensaje posterior a Plazo con resultados es la excepcion: intro breve + [SHOW_PROPERTIES] + CTA de nombre y telefono en un solo mensaje.
+- Tras recibir nombre y telefono del usuario, DEBES usar [LEAD_CAPTURED: nombre | telefono] y [SHOW_CALENDAR] en tu respuesta.
 - Menciona que los horarios suelen ocuparse rapido esta semana para crear urgencia.
 - Usa tono amigable, profesional y conversacional.
-- Precios siempre con formato: $2,450,000 MXN
+- Precios con formato $2,450,000 MXN solo si el contexto lo exige fuera del listado visual; no enumeres propiedades en texto.
 """
 
 @app.post("/chat", response_model=ChatResponse)
@@ -222,7 +225,12 @@ async def chat(req: ChatRequest):
     )
     
     assistant_msg = response.choices[0].message.content
-    if intent.get("timeline") and matched_props and "[SHOW_PROPERTIES]" not in assistant_msg:
+    if (
+        intent.get("timeline")
+        and matched_props
+        and "[SHOW_PROPERTIES]" not in assistant_msg
+        and (intent.get("name") is None or intent.get("phone") is None)
+    ):
         assistant_msg = assistant_msg.rstrip() + " [SHOW_PROPERTIES]"
     history.append({"role": "assistant", "content": assistant_msg})
     
