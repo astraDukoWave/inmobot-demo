@@ -424,8 +424,7 @@ Atención 24/7, respuestas instantáneas y propiedades personalizadas para ti.</
 
     <script>
         const API_URL = window.location.origin;
-        let sessionId = localStorage.getItem('inmobot_session') || 'session_' + Date.now();
-        localStorage.setItem('inmobot_session', sessionId);
+        let sessionId = 'session_' + Date.now();
 
         function toggleChat() {
             const chatWindow = document.getElementById('chat-window');
