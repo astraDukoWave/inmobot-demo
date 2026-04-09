@@ -93,9 +93,9 @@ def filter_properties(budget_min: Optional[int], budget_max: Optional[int],
             continue
         if budget_max and p["price_mxn"] > budget_max:
             continue
-        if zone and normalize_text(zone) not in normalize_text(p["zone"]):
+        if zone and normalize_text(zone) != normalize_text(p["zone"]):
             continue
-        if bedrooms and p["bedrooms"] < bedrooms:
+        if bedrooms and p["bedrooms"] != bedrooms:
             continue
         if prop_type and normalize_text(prop_type) not in normalize_text(p["type"]):
             continue
@@ -219,7 +219,7 @@ async def chat(req: ChatRequest):
     )
     
     assistant_msg = response.choices[0].message.content
-    if matched_props and "[SHOW_PROPERTIES]" not in assistant_msg:
+    if intent.get("timeline") and matched_props and "[SHOW_PROPERTIES]" not in assistant_msg:
         assistant_msg = assistant_msg.rstrip() + " [SHOW_PROPERTIES]"
     history.append({"role": "assistant", "content": assistant_msg})
     
