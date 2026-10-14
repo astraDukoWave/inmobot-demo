@@ -1,276 +1,122 @@
-# 🏡 InmoBot Demo - Agente IA Conversacional para Inmobiliarias
+# 🏡 InmoBot — agente inmobiliario "Sofía"
 
-**Demo funcional** de agente conversacional basado en IA para inmobiliarias en Puebla, México.
+[![ci](https://github.com/astraDukoWave/inmobot-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/astraDukoWave/inmobot-demo/actions/workflows/ci.yml)
 
-## 📌 Descripción
+Sofía es una asistente de chat para inmobiliarias:
+- Califica al prospecto: zona, presupuesto, recámaras, tipo, forma de pago, plazo, nombre y teléfono.
+- Le muestra propiedades **solo del catálogo**.
+- Registra una solicitud de visita.
+- Guarda el lead con un puntaje caliente, tibio o frío.
+- Ofrece pasar a un asesor humano por WhatsApp.
 
-Asistente virtual (Sofía) que automatiza:
-- ✅ Calificación de leads (presupuesto, zona, tipo de compra, plazo)
-- ✅ Filtrado inteligente de propiedades del catálogo
-- ✅ Captura automática de datos de contacto
-- ✅ Agendamiento de visitas
-- ✅ Atención 24/7 sin intervención humana
+> **Estado honesto**
+> - **Catálogo ficticio.** Las 10 propiedades de `properties.json` son inventadas; las imágenes son marcadores de placehold.co.
+> - **Origen.** InmoBot nació como una propuesta para un prospecto real de Workana. El prospecto mostró interés; desarrollé el demo y compartí un video, pero no se concretó la contratación ni hubo pago. Ahora lo estoy profesionalizando como proyecto de portafolio con calidad de entrega comercial. **No hay clientes en producción, testimonios ni resultados comerciales.**
+> - **Proveedor.** Corre en Gemini (`gemini-3.8-flash`), el proveedor con créditos disponibles. El núcleo no depende del proveedor. El adaptador de Claude (Anthropic) está implementado y probado contra los tipos del SDK, pero está **pendiente de validación contra la API real**.
 
-**Arquitectura Python-first:** filtrado de propiedades en backend (no LLM) para eliminar alucinaciones.
+## Arquitectura
 
----
-
-## 🚀 Inicio Rápido
-
-### 1️⃣ Prerrequisitos
-
-- Python 3.11+
-- OpenAI API key
-
-### 2️⃣ Instalación Local
-
-```bash
-git clone https://github.com/astraDukoWave/inmobot-demo.git
-cd inmobot-demo
-
-# Crear .env
-cp .env.example .env
-# Editar .env y pegar tu OPENAI_API_KEY
-
-# Instalar dependencias
-pip install -r requirements.txt
-
-# Ejecutar
-uvicorn main:app --reload --port 8000
+```mermaid
+flowchart LR
+    U["Prospecto<br/>navegador o celular"] -->|"POST /api/chat"| API["FastAPI<br/>tope de 1,000 caracteres · rate limit por IP<br/>sesión UUID del servidor · presupuesto diario"]
+    API --> G1{"Capa 1<br/>filtro determinista"}
+    G1 -->|"intento obvio de injection"| R["Rechazo sin llamar al modelo"]
+    G1 --> AG["Agente Sofía<br/>límite duro de ~20 s por turno"]
+    AG <-->|"tool use"| LLM[("Gemini<br/>gemini-3.8-flash")]
+    AG --> T["Tools con mínimo privilegio"]
+    T --> CAT[("Catálogo ficticio<br/>properties.json")]
+    T --> DB[("SQLite efímero<br/>leads y visitas")]
+    T --> WA["Enlace wa.me<br/>handoff a humano"]
+    AG -->|"tarjetas solo desde resultados de tools"| U
+    ADM["Admin con token"] -->|"/api/admin/*"| DB
 ```
 
-Abre **http://localhost:8000** en tu navegador.
+### Cómo funciona un turno
+1. **Guards.** El mensaje pasa los límites de la API.
+2. **Capa 1.** Un filtro determinista rechaza los intentos obvios de extraer o cambiar las instrucciones, sin gastar una llamada al modelo.
+3. **Bucle del agente** (`app/agent.py`):
+   - El modelo decide si llama una herramienta. El código la ejecuta y le devuelve el resultado.
+   - Repite hasta 4 rondas.
+   - Todo el turno tiene un **límite duro de ~20 s**, que cuenta desde que llega la petición. Si el modelo se cuelga, Sofía responde con un mensaje amable y el botón de WhatsApp.
+   - Una respuesta que llega tarde se descarta antes de ejecutar cualquier herramienta.
+4. **Tarjetas.** Salen **solo** de los resultados de `search_properties` y `get_property`, nunca del texto del modelo. Ese es el *grounding*: el modelo puede redactar, pero no puede inventar una propiedad que aparezca en pantalla.
+5. **Puntaje.** El código lo calcula con reglas explicables (`app/leads.py`); el modelo no lo decide.
 
----
+**Herramientas** (`app/tools.py`):
+- `search_properties` y `get_property`: leen el catálogo.
+- `save_lead`: valida el teléfono de México y actualiza el lead de la sesión.
+- `request_visit`: solo para propiedades reales del catálogo y solo con nombre y teléfono.
+- `handoff_to_human`: genera el enlace de wa.me.
 
-## 📦 Estructura del Proyecto
+Las tools solo pueden tocar el lead de la sesión que las llama.
 
-```
-inmobot-demo/
-├── main.py                 # FastAPI backend
-├── properties.json         # 10 propiedades reales de Puebla
-├── requirements.txt
-├── Dockerfile              # Railway-ready
-├── .env.example
-├── .gitignore
-└── static/
-    └── index.html          # Landing page + chat widget
-```
+## Evidencia de calidad
+- **CI en cada PR:** `ruff` + **88 pruebas** con un LLM falso, sin red ni keys (`tests/`).
+- **Prueba contra el modelo real** (`live-smoke`, manual): 3 escenarios críticos. La corrida sobre el código mergeado **pasó 3/3**, con 3.0–5.7 s por turno y ≈0.34 MXN.
+  - Fueron 6 corridas en total, 3 de ellas fallidas. Cada falla, su causa y su corrección están en [`docs/reviews/INMOBOT_S01_LIVE-SMOKE_LOG.md`](docs/reviews/INMOBOT_S01_LIVE-SMOKE_LOG.md).
+- **Revisión independiente** del PR del agente, hecha por un subagente con contexto fresco. Hallazgos H1–H7, corregidos o registrados en el backlog.
+- **Verify Report** contra el spec aprobado, requisito por requisito: [`docs/reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md`](docs/reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md).
 
----
-
-## 🧠 Arquitectura Técnica
-
-### Flujo de Conversación
-
-1. **Usuario envía mensaje** → POST `/chat`
-2. **Extracción de intent** (OpenAI `gpt-4o-mini`, `temperature=0`)
-   - JSON estructurado: `{budget_min, budget_max, zone, bedrooms, purchase_type, timeline, name, phone}`
-3. **Filtrado Python** (sin LLM):
-   ```python
-   matched = filter_properties(budget_max, zone, bedrooms, prop_type)
-   ```
-4. **LLM redacta respuesta** con propiedades inyectadas en system context
-5. **Parse tags especiales:**
-   - `[SHOW_PROPERTIES]` → envía array de propiedades al frontend
-   - `[LEAD_CAPTURED: nombre | telefono]` → guarda en SQLite
-   - `[SHOW_CALENDAR]` → muestra link Calendly
-
-### Stack
-
-| Componente | Tecnología |
+| Escenario crítico (corrida 6, `7be5400`) | Resultado |
 |---|---|
-| Backend | FastAPI 0.115 |
-| LLM | OpenAI GPT-4o-mini |
-| DB | SQLite (leads) |
-| Frontend | Vanilla JS + CSS |
-| Deploy | Railway.app (Dockerfile incluido) |
+| "Busco casa en Cholula, hasta 2.5 millones, 3 recámaras" | ✅ `search_properties` → tarjetas [4, 5] |
+| Lead + visita + WhatsApp (5 turnos) | ✅ `save_lead`, `request_visit` (propiedad 4), `handoff_to_human` |
+| Prompt injection directa | ✅ rechazada por la **capa determinista** (no prueba la resistencia general del modelo) |
 
----
+## Seguridad
+- **Interfaz:** todo se pinta con `textContent`; cero `innerHTML`, verificado por prueba. CSP estricta, sin scripts inline.
+- **Sesión:** UUID4 generado por el servidor; un candado por sesión responde 409 a un segundo mensaje simultáneo.
+- **Admin** (`/api/admin/leads`, `stats`, `usage`): exige `Authorization: Bearer <ADMIN_TOKEN>` con comparación en tiempo constante. Sin token configurado, responde 503.
+- **CORS:** cerrado por defecto (mismo origen).
+- **Límites:** 1,000 caracteres por mensaje, historial de 12 turnos, rate limit por IP y presupuesto diario de tokens.
+- **Prompt injection, en 3 capas:**
+  1. Filtro determinista.
+  2. Reglas del prompt con tools de mínimo privilegio: aunque engañen al modelo, no hay datos ajenos que pueda alcanzar.
+  3. *Canary* en la salida.
+- **Logs:** una línea por turno con latencia, tokens, tools y costo estimado, **sin texto ni teléfonos** (verificado por prueba).
 
-## 📁 Catálogo de Propiedades
+## Límites conocidos
+- **Datos:** SQLite vive en el disco efímero del dyno y se borra en cada deploy o reinicio. Solo sirve para la demo con datos de prueba; el siguiente paso sería Postgres (LB-01).
+- **Costo:**
+  - Una conversación de 5 turnos midió ~18–20 mil tokens de entrada, ≈0.3 MXN.
+  - `DAILY_TOKEN_BUDGET` da una **estimación** de ≈12 MXN/día, **no un máximo garantizado**: el contador vive en memoria, vuelve a cero con cada reinicio y no cuenta las llamadas abandonadas por timeout.
+  - El límite real es el spend cap mensual del proyecto en AI Studio.
+- **Tiempo:** el límite de ~20 s cuenta desde que la app recibe la petición. No incluye la cola del router de Heroku.
+- **Concurrencia:** un solo proceso. Sesiones y rate limit viven en memoria; para más de un dyno harían falta en Redis (LB-02).
+- **Calidad sin medir:**
+  - Latencia p95: la muestra es chica; el máximo observado fue 9.8 s.
+  - La resistencia general del modelo a injection *indirecta* (LB-12).
+  - El rechazo de temas ajenos contra el modelo real.
+- **Pospuesto en este ciclo:** circuit breaker (LB-10), servidor MCP y suite de evals.
 
-`properties.json` incluye 10 propiedades realistas:
-
-- **Zonas:** Angelópolis, Cholula, Centro, Lomas de Angelópolis
-- **Precios:** $1.5M - $4.8M MXN
-- **Tipos:** Departamentos, casas, lofts, penthouses
-- **Detalles:** Recamaras, baños, m², amenidades, descripciones convincentes
-
----
-
-## 🔑 Endpoints API
-
-### `POST /chat`
-
-**Request:**
-```json
-{
-  "session_id": "session_123",
-  "message": "Busco departamento en Angelópolis de 2M"
-}
-```
-
-**Response:**
-```json
-{
-  "reply": "Perfecto, tengo varias opciones...",
-  "properties": [
-    {
-      "id": 3,
-      "name": "Torre Atlixcáyotl 1202",
-      "price_mxn": 2750000,
-      "zone": "Angelópolis",
-      "bedrooms": 2,
-      "bathrooms": 2
-    }
-  ],
-  "lead_saved": false
-}
-```
-
-### `GET /leads`
-
-Retorna todos los leads capturados (SQLite).
-
----
-
-## 🌐 Deploy en Railway
-
-1. **Fork este repo**
-2. **Conecta Railway.app** con tu GitHub
-3. **New Project → Deploy from GitHub repo**
-4. **Agregar variable de entorno:**
-   - `OPENAI_API_KEY` = tu key
-5. **Railway detecta el Dockerfile automáticamente**
-6. **Deploy completo en ~2 min**
-
-Link público: `https://inmobot-demo-production.up.railway.app`
-
----
-
-## 📊 Sistema de Calificación de Leads
-
-### Flujo de 5 Pasos
-
-1. **Presupuesto** → filtra por rango de precio
-2. **Zona** → Angelópolis / Cholula / Centro / Lomas
-3. **Recámaras** → 2, 3, 4+
-4. **Tipo de compra** → Crédito / Contado (**fricción comercial**)
-5. **Plazo** → Inmediato / 3 meses / Explorando (**urgencia**)
-
-### Captura de Lead
-
-Cuando el bot detecta `nombre + teléfono` en la conversación:
-
-```python
-if "[LEAD_CAPTURED:" in assistant_msg:
-    save_lead(intent, session_id)  # → SQLite
-```
-
-**Schema de `leads.db`:**
-
-```sql
-CREATE TABLE leads (
-    id INTEGER PRIMARY KEY,
-    name TEXT,
-    phone TEXT,
-    zone TEXT,
-    budget_max INTEGER,
-    purchase_type TEXT,
-    timeline TEXT,
-    session_id TEXT,
-    created_at TEXT
-);
-```
-
----
-
-## ⚡ Optimizaciones Clave
-
-### 1. Zero Alucinaciones
-
-**Problema:** LLMs inventan propiedades inexistentes.
-
-**Solución:**
-```python
-# Filtrado en Python ANTES de pasar al LLM
-matched_props = filter_properties(budget_max, zone, bedrooms)
-
-# LLM solo redacta con datos reales inyectados
-messages = [
-    {"role": "system", "content": SYSTEM_PROMPT + f"\n\nPropiedades disponibles:\n{json.dumps(matched_props)}"}
-]
-```
-
-### 2. System Prompt con Control Estricto
-
-```python
-SYSTEM_PROMPT = """
-REGLAS CRITICAS:
-- NUNCA inventes propiedades. Solo usa las que el backend te proporcione.
-- Si no hay coincidencias, pide ajustar criterios.
-- Haz UNA sola pregunta por mensaje.
-- Cuando captures nombre Y telefono, incluye [LEAD_CAPTURED: nombre | telefono]
-"""
-```
-
-### 3. Extracción de Intent con `temperature=0`
-
-```python
-resp = client.chat.completions.create(
-    model="gpt-4o-mini",
-    messages=extraction_prompt,
-    temperature=0,  # Determinístico
-    max_tokens=200
-)
-```
-
----
-
-## 👨‍💻 Uso en Cursor Pro
-
+## Correr local
+Requiere Python ≥ 3.10.
 ```bash
-# Clonar desde GitHub
-git clone https://github.com/astraDukoWave/inmobot-demo.git
-cd inmobot-demo
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest -q && ruff check .                                   # sin red ni keys
+cp .env.example .env                                        # pon tu GEMINI_API_KEY
+uvicorn app.main:create_app --factory --env-file .env --port 8000
+```
+- Sin key, corre con un LLM guionado: `LLM_PROVIDER=fake uvicorn app.main:create_app --factory`.
+- Deploy en Heroku (contenedor + `heroku.yml`): ver [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
-# Abrir en Cursor
-cursor .
+## Cómo se construyó
+Con un flujo de *Spec-Driven Development* y Claude Code: spec aprobado → plan → un PR por change set → CI → verify → merge con SHA fijado → cto-review → deploy hecho por una persona.
+- Los commits del ciclo INMOBOT-S01 llevan `Co-Authored-By: Claude`.
+- Los 21 commits originales de abril de 2026 se hicieron con Cursor.
 
-# Crear .env
-cp .env.example .env
-# Pegar OPENAI_API_KEY en .env
+Detalle y enlaces a cada artefacto: [`docs/WORKFLOW.md`](docs/WORKFLOW.md). Guion de demo: [`docs/DEMO.md`](docs/DEMO.md). Preguntas técnicas frecuentes: [`docs/FAQ.md`](docs/FAQ.md).
 
-# Ejecutar con terminal integrada
-uvicorn main:app --reload
+## Estructura
+```
+app/            agente, tools, guards, API (FastAPI) y adaptadores de LLM (app/llm/)
+static/         interfaz (HTML + JS sin frameworks + CSS)
+tests/          88 pruebas con LLM falso
+scripts/        live_smoke.py (prueba contra el modelo real)
+docs/           spec, plan, reviews, runbook, demo, FAQ, workflow y backlog
+properties.json catálogo ficticio
 ```
 
----
-
-## 🎯 Roadmap / Mejoras Futuras
-
-- [ ] Integración con WhatsApp Business API
-- [ ] Conexión a CRM real (HubSpot, Salesforce)
-- [ ] Multi-idioma (español/inglés)
-- [ ] Análisis de sentimiento del lead
-- [ ] Notificaciones push al agente inmobiliario
-- [ ] Dashboard de métricas (tasa de conversión, leads calificados)
-
----
-
-## 📄 Licencia
-
-MIT License - Ver archivo `LICENSE` para más detalles.
-
----
-
-## 👤 Autor
-
-**astraDukoWave**
-- GitHub: [@astraDukoWave](https://github.com/astraDukoWave)
-
----
-
-⭐ **Si este demo te sirvió para ganar un cliente, considera darle una estrella al repo!**
-
+## Licencia
+[MIT](LICENSE) © 2026 Jonathan García (astraDukoWave)
