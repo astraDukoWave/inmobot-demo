@@ -1,3 +1,5 @@
+> **Archivado (2026-10-14).** Reporte de abril de 2026, conservado por trazabilidad. **Contiene afirmaciones inexactas**: por ejemplo, dice que el sistema "resiste prompt injection", pero ese código no tenía ninguna defensa. La línea base verificada está en `docs/reviews/INMOBOT_S01_BASELINE-AUDIT_v1.0.md`.
+
 # 📋 Reporte de QA - InmoBot Demo
 
 ## 🎯 Resumen Ejecutivo
