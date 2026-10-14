@@ -10,7 +10,8 @@ validación real) + UI estática. Catálogo **ficticio** en `properties.json`.
 - Instalar: `python -m pip install -r requirements-dev.txt`
 - Pruebas (sin red ni keys): `pytest -q`
 - Lint: `ruff check .`
-- Correr local: `LLM_PROVIDER=fake uvicorn app.main:app --reload` (o `gemini` con `GEMINI_API_KEY` en `.env`)
+- Correr local: `LLM_PROVIDER=fake uvicorn app.main:create_app --factory --reload`
+  (o con Gemini: `uvicorn app.main:create_app --factory --env-file .env`)
 - Prueba real (cuesta tokens): `python scripts/live_smoke.py`
 
 ## Reglas

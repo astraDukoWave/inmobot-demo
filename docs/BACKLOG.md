@@ -13,3 +13,5 @@ Toda oportunidad fuera del ciclo en curso vive aquí, con su trigger o hipótesi
 | LB-07 | opportunity | Modo demo offline con LLM guionado | Hipótesis: demos sin internet | S01 brainstorm |
 | LB-08 | opportunity | Multi-tenant (catálogo e identidad por inmobiliaria) | Trigger: segundo cliente | S01 spec |
 | LB-09 | opportunity | Calendario real para confirmar visitas | Hipótesis: la confirmación humana es cuello de botella | S01 spec |
+| LB-10 | opportunity | Circuit breaker del proveedor (REQ-17, pospuesto por A4) | Trigger: más de 3 fallos del proveedor por minuto en logs | Revisión independiente PR #2 |
+| LB-11 | opportunity | Timeout total por llamada (hoy httpx aplica el timeout por fase) | Trigger: un turno > 20 s en logs | Revisión independiente PR #2 |
