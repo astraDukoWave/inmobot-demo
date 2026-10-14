@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -70,6 +71,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, c
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next):
+        request.state.received_at = time.monotonic()  # el límite de ~20 s cuenta desde aquí (A5)
         response = await call_next(request)
         for key, value in SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
@@ -107,7 +109,7 @@ def create_app(settings: Settings | None = None, llm: LLMClient | None = None, c
         if not session.lock.acquire(blocking=False):
             return _error(409, "busy", "Espera la respuesta anterior.")
         try:
-            result = agent.run_turn(session, text)
+            result = agent.run_turn(session, text, started_at=getattr(request.state, "received_at", None))
             session.history = trim_history(session.history, settings.max_history_turns)
         finally:
             session.lock.release()
