@@ -78,7 +78,7 @@ def main() -> int:
         for i, (res, invented) in enumerate(results, 1):
             check(not invented, f"t{i}: menciona propiedades que no están en tarjetas: {invented}", failures)
             check(res.latency_ms <= 21_000, f"t{i}: latencia {res.latency_ms} ms > 21 s", failures)
-            check(res.fallback in (None, "canary"), f"t{i}: fallback inesperado {res.fallback}", failures)
+            check(res.fallback is None, f"t{i}: fallback {res.fallback} (canary también cuenta como falla)", failures)
         usage = sum((r.usage for r, _ in results), start=results[0][0].usage.__class__())
         rows.append({"name": name, "ok": not failures, "failures": failures,
                      "tools": [t for r, _ in results for t in r.tool_calls],
