@@ -21,8 +21,13 @@ Vienen del Verify Report del PR #2 (`docs/reviews/`).
   - Si el modelo se cuelga, Sofía responde con un mensaje amable y el botón de WhatsApp. Una respuesta tardía se descarta antes de ejecutar cualquier tool.
 - **Costo:**
   - Una conversación completa de 5 turnos midió ~18–20 mil tokens de entrada (live-smoke 6: 18,450). Eso es ≈ $0.016 USD ≈ 0.3 MXN.
-  - `DAILY_TOKEN_BUDGET=800000` alcanza para unas 40 conversaciones al día, con un tope de ≈ 12 MXN diarios.
-  - Los tokens de una llamada abandonada por timeout no se descuentan del presupuesto (no llega su conteo). El rate limit por IP acota ese hueco.
+  - `DAILY_TOKEN_BUDGET=800000` equivale a unas 40 conversaciones al día, **≈ 12 MXN al día como estimación**.
+  - **No es un máximo garantizado:**
+    - El contador vive en memoria y vuelve a cero en cada reinicio o deploy del dyno.
+    - No incluye los tokens de las llamadas abandonadas por timeout, porque nunca llega su conteo.
+  - **El límite real de gasto es el spend cap mensual del proyecto en AI Studio** (https://aistudio.google.com/spend).
+    - Google lo marca como experimental y tarda ~10 min en aplicarse.
+    - Complementa con una alerta de presupuesto en Google Cloud Billing.
 - **Concurrencia:** hasta 16 llamadas al modelo a la vez. Si se saturan, los turnos nuevos reciben el mensaje amable.
 - **Calidad medida:**
   - 6 corridas de `live-smoke`. La última, sobre el SHA mergeado, pasó 3/3 críticos.
