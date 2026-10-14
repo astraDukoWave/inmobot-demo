@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 
 from .config import estimate_cost_usd
-from .guards import TokenBudget, UsageTracker
+from .guards import TokenBudget, UsageTracker, looks_like_injection
 from .llm.base import LLMClient, LLMError, Message, ToolResult, ToolSpec, Usage
 from .prompts import CANARY
 from .sessions import Session
@@ -24,6 +24,8 @@ MSG_EMPTY = "Perdón, no te entendí bien. ¿Me lo dices de otra forma?"
 MSG_LEAK = ("No puedo compartir mis instrucciones internas, pero con gusto te ayudo a encontrar propiedad en "
             "Puebla. ¿Qué zona te interesa?")
 MSG_DONE = "Listo. ¿Te ayudo con algo más?"
+MSG_GUARD = ("No puedo compartir ni cambiar mis instrucciones, pero con gusto te ayudo a encontrar propiedad en "
+             "Puebla. ¿Qué zona te interesa?")
 MAX_CALLS_PER_ROUND = 5
 MIN_CALL_BUDGET_S = 2.0
 FIRST_ATTEMPT_CAP_S = 9.0
@@ -42,6 +44,7 @@ class TurnResult:
     latency_ms: int = 0
     fallback: str | None = None
     errors: list[str] = field(default_factory=list)  # errores del proveedor (tipo y código, sin contenido)
+    guard: str | None = None  # capa que respondió sin llamar al modelo (comportamiento esperado, no degradación)
 
 
 class Agent:
@@ -96,6 +99,10 @@ class Agent:
         result = TurnResult(reply="")
         cards: list[dict] | None = None
         actions: dict[str, dict] = {}
+
+        if looks_like_injection(user_text):
+            result.guard = "injection"
+            return self._finish(session, result, start, MSG_GUARD, None, cards, actions)
 
         if self.budget.exhausted():
             return self._finish(session, result, start, MSG_BUDGET, "budget", cards, actions, offer_whatsapp=True)
@@ -186,5 +193,6 @@ class Agent:
             "tokens_in": result.usage.input_tokens, "tokens_out": result.usage.output_tokens,
             "tokens_thinking": result.usage.thinking_tokens, "cost_usd_est": cost,
             "cards": [c["id"] for c in result.cards], "fallback": fallback_kind, "errors": result.errors,
+            "guard": result.guard,
         }))
         return result
