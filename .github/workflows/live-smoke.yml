@@ -1,0 +1,35 @@
+# Prueba mínima contra el modelo REAL (REQ-32). Manual: cuesta tokens.
+# Debe existir en main para que GitHub muestre "Run workflow"; se puede correr sobre cualquier rama.
+name: live-smoke
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: "Modelo de Gemini"
+        required: false
+        default: "gemini-3.8-flash"
+permissions:
+  contents: read
+concurrency:
+  group: live-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Live smoke against the real model
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LLM_PROVIDER: gemini
+          GEMINI_MODEL: ${{ inputs.model }}
+        run: python scripts/live_smoke.py --report smoke-report.md
+      - name: Publish report
+        if: always()
+        run: test -f smoke-report.md && cat smoke-report.md >> "$GITHUB_STEP_SUMMARY" || true
