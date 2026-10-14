@@ -1,0 +1,163 @@
+"""Bucle del agente: generate → tools → generate, con deadline total por turno (A5) y grounding de tarjetas."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import time
+from dataclasses import dataclass, field
+
+from .config import estimate_cost_usd
+from .guards import TokenBudget, UsageTracker
+from .llm.base import LLMClient, LLMError, Message, ToolResult, ToolSpec, Usage
+from .prompts import CANARY
+from .sessions import Session
+from .tools import ToolExecutor
+
+log = logging.getLogger("inmobot.agent")
+
+MSG_PROVIDER = ("Perdón, en este momento no puedo responder: el servicio de IA no está disponible. "
+                "Si quieres, continúa con un asesor por WhatsApp.")
+MSG_BUDGET = "La demo alcanzó su límite de uso de hoy. Si quieres, continúa con un asesor por WhatsApp."
+MSG_EMPTY = "Perdón, no te entendí bien. ¿Me lo dices de otra forma?"
+MSG_LEAK = ("No puedo compartir mis instrucciones internas, pero con gusto te ayudo a encontrar propiedad en "
+            "Puebla. ¿Qué zona te interesa?")
+MSG_DONE = "Listo. ¿Te ayudo con algo más?"
+MAX_CALLS_PER_ROUND = 5
+MIN_CALL_BUDGET_S = 2.0
+
+
+@dataclass
+class TurnResult:
+    reply: str
+    cards: list[dict] = field(default_factory=list)
+    actions: list[dict] = field(default_factory=list)
+    lead_saved: bool = False
+    usage: Usage = field(default_factory=Usage)
+    tool_calls: list[str] = field(default_factory=list)
+    rounds: int = 0
+    latency_ms: int = 0
+    fallback: str | None = None
+
+
+class Agent:
+    def __init__(self, llm: LLMClient, executor: ToolExecutor, system_prompt: str, tools: list[ToolSpec], *,
+                 budget: TokenBudget, usage: UsageTracker, max_rounds: int = 4, deadline_s: float = 20.0,
+                 clock=time.monotonic, sleep=time.sleep):
+        self.llm = llm
+        self.executor = executor
+        self.system_prompt = system_prompt
+        self.tools = tools
+        self.budget = budget
+        self.usage = usage
+        self.max_rounds = max_rounds
+        self.deadline_s = deadline_s
+        self.clock = clock
+        self.sleep = sleep
+
+    def _generate(self, history: list[Message], deadline: float, tool_choice: str = "auto"):
+        """Una llamada con el tiempo que queda; un solo reintento si el error es reintentable y hay margen."""
+        for attempt in (1, 2):
+            remaining = deadline - self.clock()
+            if remaining < MIN_CALL_BUDGET_S:
+                raise LLMError("deadline", "sin tiempo para llamar al modelo")
+            try:
+                return self.llm.generate(system=self.system_prompt, messages=history, tools=self.tools,
+                                         timeout_s=remaining - 0.5, tool_choice=tool_choice)
+            except LLMError as exc:
+                if attempt == 2 or not exc.retryable or deadline - self.clock() < MIN_CALL_BUDGET_S + 1.5:
+                    raise
+                self.sleep(0.8)
+        raise LLMError("unreachable")
+
+    def run_turn(self, session: Session, user_text: str) -> TurnResult:
+        start = self.clock()
+        deadline = start + self.deadline_s
+        session.history.append(Message(role="user", text=user_text))
+        session.turns += 1
+        result = TurnResult(reply="")
+        cards: list[dict] | None = None
+        actions: dict[str, dict] = {}
+
+        if self.budget.exhausted():
+            return self._finish(session, result, start, MSG_BUDGET, "budget", cards, actions, offer_whatsapp=True)
+
+        reply = ""
+        for round_no in range(1, self.max_rounds + 1):
+            result.rounds = round_no
+            try:
+                response = self._generate(session.history, deadline)
+            except LLMError as exc:
+                return self._finish(session, result, start, MSG_PROVIDER, exc.kind, cards, actions,
+                                    offer_whatsapp=True)
+            result.usage = result.usage + response.usage
+            self.budget.consume(response.usage.total)
+            message = response.message
+            if not message.text and not message.tool_calls:
+                return self._finish(session, result, start, MSG_EMPTY, f"empty:{response.finish_reason}",
+                                    cards, actions)
+            session.history.append(message)
+            if not message.tool_calls:
+                reply = message.text
+                break
+            tool_results = []
+            for call in message.tool_calls[:MAX_CALLS_PER_ROUND]:
+                outcome = self.executor.execute(call, session.id)
+                result.tool_calls.append(call.name)
+                if outcome.cards is not None:
+                    cards = outcome.cards  # grounding: solo resultados de tools; gana la última del turno
+                for action in outcome.actions:
+                    actions[action["type"]] = action
+                result.lead_saved = result.lead_saved or outcome.lead_saved
+                tool_results.append(ToolResult(call_id=call.id, name=call.name, content=outcome.content,
+                                               is_error=outcome.is_error, provider_id=call.provider_id))
+            session.history.append(Message(role="tool", tool_results=tool_results))
+        else:
+            # Se acabaron las rondas: una última llamada sin tools para cerrar con texto.
+            try:
+                response = self._generate(session.history, deadline, tool_choice="none")
+                result.usage = result.usage + response.usage
+                self.budget.consume(response.usage.total)
+                if response.message.text and not response.message.tool_calls:
+                    session.history.append(response.message)
+                    reply = response.message.text
+            except LLMError:
+                pass
+            if not reply:
+                return self._finish(session, result, start, MSG_DONE, "max_rounds", cards, actions)
+
+        if CANARY in reply:
+            session.history[-1] = Message(role="assistant", text=MSG_LEAK)
+            return self._finish(session, result, start, None, "canary", cards, actions, keep_history=True,
+                                reply_override=MSG_LEAK)
+        return self._finish(session, result, start, None, None, cards, actions, keep_history=True,
+                            reply_override=reply)
+
+    def _finish(self, session: Session, result: TurnResult, start: float, fallback_text: str | None,
+                fallback_kind: str | None, cards, actions: dict, offer_whatsapp: bool = False,
+                keep_history: bool = False, reply_override: str | None = None) -> TurnResult:
+        if fallback_text is not None and not keep_history:
+            # Mantiene la alternancia user/assistant para cualquier proveedor.
+            session.history.append(Message(role="assistant", text=fallback_text))
+        if offer_whatsapp and self.executor.whatsapp_number and "whatsapp" not in actions:
+            actions["whatsapp"] = self.executor.whatsapp_action(session.id)
+        result.reply = reply_override if reply_override is not None else (fallback_text or "")
+        result.cards = cards or []
+        result.actions = list(actions.values())
+        result.fallback = fallback_kind
+        result.latency_ms = int((self.clock() - start) * 1000)
+        cost = estimate_cost_usd(self.llm.model, result.usage.input_tokens,
+                                 result.usage.output_tokens + result.usage.thinking_tokens)
+        self.usage.record(latency_ms=result.latency_ms, input_tokens=result.usage.input_tokens,
+                          output_tokens=result.usage.output_tokens, thinking_tokens=result.usage.thinking_tokens,
+                          cost_usd=cost, fallback=fallback_kind)
+        log.info(json.dumps({
+            "event": "turn", "session": hashlib.sha256(session.id.encode()).hexdigest()[:10],
+            "turn": session.turns, "provider": self.llm.provider, "model": self.llm.model,
+            "latency_ms": result.latency_ms, "rounds": result.rounds, "tools": result.tool_calls,
+            "tokens_in": result.usage.input_tokens, "tokens_out": result.usage.output_tokens,
+            "tokens_thinking": result.usage.thinking_tokens, "cost_usd_est": cost,
+            "cards": [c["id"] for c in result.cards], "fallback": fallback_kind,
+        }))
+        return result
