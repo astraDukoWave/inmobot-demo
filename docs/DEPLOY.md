@@ -10,6 +10,27 @@ Cada paso incluye **Verifica:** con lo que debes ver. Si no coincide, detente y 
 - **Disco efímero:** SQLite vive en `/tmp`. Se borra en cada deploy o reinicio, y Heroku reinicia el dyno al menos una vez cada 24 h.
   - Úsalo solo para la demo, con datos de prueba.
 
+## Límites que debes conocer antes de desplegar
+Vienen del Verify Report del PR #2 (`docs/reviews/`).
+
+- **Datos:**
+  - SQLite vive en `/tmp`, un disco efímero: se borra en cada deploy o reinicio. Úsalo solo para la demo, con datos de prueba.
+  - Los leads de un ensayo se pierden si vuelves a desplegar.
+- **Tiempo por turno: ~20 s.**
+  - Cuenta desde que la app recibe la petición. No incluye la cola previa del router de Heroku, que corta a los 30 s.
+  - Si el modelo se cuelga, Sofía responde con un mensaje amable y el botón de WhatsApp. Una respuesta tardía se descarta antes de ejecutar cualquier tool.
+- **Costo:**
+  - Una conversación completa de 5 turnos midió ~18–20 mil tokens de entrada (live-smoke 6: 18,450). Eso es ≈ $0.016 USD ≈ 0.3 MXN.
+  - `DAILY_TOKEN_BUDGET=800000` alcanza para unas 40 conversaciones al día, con un tope de ≈ 12 MXN diarios.
+  - Los tokens de una llamada abandonada por timeout no se descuentan del presupuesto (no llega su conteo). El rate limit por IP acota ese hueco.
+- **Concurrencia:** hasta 16 llamadas al modelo a la vez. Si se saturan, los turnos nuevos reciben el mensaje amable.
+- **Calidad medida:**
+  - 6 corridas de `live-smoke`. La última, sobre el SHA mergeado, pasó 3/3 críticos.
+  - La latencia p95 es desconocida; el máximo observado fue 9.8 s.
+  - El escenario de prompt injection valida la **capa determinista**, no la resistencia general del modelo.
+  - El rechazo de temas ajenos no se ha probado contra el modelo real.
+- **Proveedor:** el adaptador de Claude (Anthropic) está **pendiente de validación real**. En Heroku se usa Gemini.
+
 ## 0. Requisitos (una sola vez)
 
 1. Abre la app Terminal.
