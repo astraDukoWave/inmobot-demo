@@ -71,10 +71,13 @@ En 3 capas:
 - **Lo que ve el usuario:** un mensaje amable y el botón de WhatsApp.
 - **Evidencia:** esto se diseñó a partir de fallas reales en las corridas 2–4 de `live-smoke` (ver la bitácora), y lo cubren pruebas de reloj real en `tests/test_deadline.py`.
 
-## 9. ¿Por qué Gemini si el puesto es de Claude?
-- **Razón práctica:** no tenía créditos de la API de Anthropic y sí de Google.
-- **Diseño:** el núcleo no depende del proveedor (`app/llm/`). Cambiar de modelo es una variable de entorno: `LLM_PROVIDER=anthropic`.
-- **Estado del adaptador de Claude:** está implementado y probado contra los tipos del SDK de Anthropic, pero **está pendiente de validación contra la API real**, y así está declarado.
+## 9. ¿Por qué Gemini y cómo se integra Claude?
+- **Por qué Gemini:** es el proveedor con créditos disponibles para esta demostración.
+- **Cómo se integra Claude:** el núcleo no depende del proveedor (`app/llm/`). El agente habla con una interfaz neutral (`LLMClient`) y cada proveedor tiene un adaptador.
+  - El adaptador de Claude (`app/llm/anthropic.py`) traduce las tools al tool use de la Messages API y el historial a bloques `tool_use` y `tool_result`.
+  - Se activa con `LLM_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` y `ANTHROPIC_MODEL`.
+- **Estado:** está probado contra los tipos del SDK de Anthropic (`tests/test_llm_adapters.py`), pero **está pendiente de validación contra la API real**.
+  - Para validarlo: correr `live-smoke` con `LLM_PROVIDER=anthropic` y su key como secret.
 
 ## 10. ¿Cómo lo probaste y qué falta probar?
 - **Probado:**
