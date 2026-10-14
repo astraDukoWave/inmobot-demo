@@ -31,6 +31,21 @@ Vienen del Verify Report del PR #2 (`docs/reviews/`).
   - El rechazo de temas ajenos no se ha probado contra el modelo real.
 - **Proveedor:** el adaptador de Claude (Anthropic) está **pendiente de validación real**. En Heroku se usa Gemini.
 
+## Emergencia (tenlo a la mano)
+- **Apagar ya**, sin borrar nada:
+  ```bash
+  heroku ps:scale web=0 -a inmobot-sofia
+  ```
+  Usa `inmobot-sofia-jg` si ese fue el nombre.
+- **Volver a la versión anterior:**
+  ```bash
+  heroku releases -a inmobot-sofia
+  heroku rollback vNN -a inmobot-sofia
+  ```
+- **Si crees que la key de Gemini se filtró:**
+  1. Bórrala en https://aistudio.google.com/apikey y crea otra.
+  2. Cárgala con el bloque `read -s` del paso 3.
+
 ## 0. Requisitos (una sola vez)
 
 1. Abre la app Terminal.
@@ -92,7 +107,12 @@ heroku config:set WHATSAPP_NUMBER=52XXXXXXXXXX -a "$APP"
 ```
 Sin `WHATSAPP_NUMBER`, Sofía dice que un asesor llamará al teléfono registrado y no muestra ningún botón.
 
-**Verifica:** `heroku config -a "$APP"` lista `LLM_PROVIDER`, `GEMINI_MODEL`, `GEMINI_API_KEY`, `ADMIN_TOKEN`, `TRUST_PROXY` y `DAILY_TOKEN_BUDGET`. Esta pantalla muestra valores: no la compartas.
+**Verifica sin mostrar valores:**
+```bash
+heroku config -a "$APP" | cut -d: -f1
+```
+Debe listar `LLM_PROVIDER`, `GEMINI_MODEL`, `GEMINI_API_KEY`, `ADMIN_TOKEN`, `TRUST_PROXY` y `DAILY_TOKEN_BUDGET`.
+Nunca corras `heroku config` ni `heroku config:get` sin filtro mientras compartes pantalla o grabas: muestran los secretos.
 
 ## 4. Deploy
 
