@@ -23,15 +23,21 @@ class ToolOutcome:
     lead_saved: bool = False
 
 
+MAX_INT_ARG = 10_000_000_000  # 10 mil millones: cota de cordura para montos e ids
+
+
 def _int_or_none(value: Any) -> int | None:
     if value is None or value == "":
         return None
     if isinstance(value, bool):
         raise ValueError("bool")
     if isinstance(value, (int, float)):
-        return int(value)
-    cleaned = str(value).replace(",", "").replace("$", "").strip()
-    return int(float(cleaned))
+        number = int(value)
+    else:
+        number = int(float(str(value).replace(",", "").replace("$", "").strip()))
+    if abs(number) > MAX_INT_ARG:
+        raise ValueError("número fuera de rango")
+    return number
 
 
 def _enum_or_none(value: Any, allowed: tuple[str, ...]) -> str | None:
@@ -117,9 +123,13 @@ class ToolExecutor:
             return ToolOutcome({"error": f"Herramienta desconocida: {call.name}"}, is_error=True)
         try:
             return handler(call.args or {}, session_id)
-        except (ValueError, TypeError) as exc:
-            log.info("tool_error", extra={"tool": call.name, "kind": type(exc).__name__})
+        except (ValueError, TypeError, OverflowError) as exc:
+            log.info('{"event": "tool_error", "tool": "%s", "kind": "%s"}', call.name, type(exc).__name__)
             return ToolOutcome({"error": f"Argumentos inválidos: {exc}"}, is_error=True)
+        except Exception as exc:  # nunca dejar el historial con un function_call sin respuesta (hallazgo H2)
+            log.warning('{"event": "tool_crash", "tool": "%s", "kind": "%s"}', call.name, type(exc).__name__)
+            return ToolOutcome({"error": "Error interno de la herramienta; ofrece hablar con un asesor."},
+                               is_error=True)
 
     # --- tools -------------------------------------------------------------------------------------------
     def _t_search_properties(self, args: dict, session_id: str) -> ToolOutcome:
