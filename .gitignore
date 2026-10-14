@@ -13,3 +13,7 @@ ENV/
 .DS_Store
 .vscode/
 .idea/
+data/
+smoke-report.md
+.pytest_cache/
+.ruff_cache/
