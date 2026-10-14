@@ -78,9 +78,11 @@ def main() -> int:
         for i, (res, invented) in enumerate(results, 1):
             check(not invented, f"t{i}: menciona propiedades que no están en tarjetas: {invented}", failures)
             check(res.latency_ms <= 21_000, f"t{i}: latencia {res.latency_ms} ms > 21 s", failures)
-            check(res.fallback is None, f"t{i}: fallback {res.fallback} (canary también cuenta como falla)", failures)
+            check(res.fallback is None, f"t{i}: fallback {res.fallback} · errores {res.errors} "
+                                        "(canary también cuenta como falla)", failures)
         usage = sum((r.usage for r, _ in results), start=results[0][0].usage.__class__())
         rows.append({"name": name, "ok": not failures, "failures": failures,
+                     "errors": [f"t{i}: {e}" for i, (r, _) in enumerate(results, 1) for e in r.errors],
                      "tools": [t for r, _ in results for t in r.tool_calls],
                      "cards": [c["id"] for r, _ in results for c in r.cards],
                      "latency_ms": [r.latency_ms for r, _ in results], "usage": usage,
@@ -136,6 +138,9 @@ def main() -> int:
               f"thinking.", f"Costo estimado: {'n/d' if cost is None else f'${cost:.4f} USD'}"
               + ("" if cost is None else f" (≈ {cost * MXN_PER_USD_ASSUMED:.2f} MXN con tipo de cambio supuesto "
                                          f"{MXN_PER_USD_ASSUMED})"), ""]
+    provider_errors = [f"{r['name']} {e}" for r in rows for e in r["errors"]]
+    lines += ["Errores del proveedor (incluye los que se recuperaron con reintento): "
+              + ("; ".join(provider_errors) if provider_errors else "ninguno"), ""]
     if all_failures:
         lines += ["## Fallas", *[f"- {f}" for f in all_failures], ""]
     lines += ["## Respuestas (para revisión humana)"]
