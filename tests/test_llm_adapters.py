@@ -112,3 +112,36 @@ def test_anthropic_adapter_conversion_and_parsing():
     assert roles == ["user", "assistant", "user"]  # tool_result + texto del usuario fusionados
     assert captured["messages"][2]["content"][0]["type"] == "tool_result"
     assert AnthropicLLM.validated_against_real_api is False
+
+
+def test_gemini_wire_server_deadline_never_below_10s_and_key_header_kept():
+    """SDK real + transporte simulado: valida los headers que salen de verdad (regresión live-smoke 3/3)."""
+    import httpx
+    from google import genai
+
+    captured = []
+
+    def handler(request):
+        captured.append(request)
+        return httpx.Response(200, json={
+            "candidates": [{"content": {"role": "model", "parts": [{"text": "hola"}]}, "finishReason": "STOP"}],
+            "usageMetadata": {"promptTokenCount": 3, "candidatesTokenCount": 1, "totalTokenCount": 4}})
+
+    client = genai.Client(api_key="test-key-placeholder", http_options=types.HttpOptions(
+        httpx_client=httpx.Client(transport=httpx.MockTransport(handler))))
+    llm = GeminiLLM(None, "gemini-3.8-flash", client=client)
+    for timeout_s, expected in ((9.0, "10"), (3.2, "10"), (19.5, "20")):
+        resp = llm.generate(system="s", messages=[Message(role="user", text="hola")], tools=TOOLS,
+                            timeout_s=timeout_s)
+        assert resp.message.text == "hola"
+        assert captured[-1].headers["x-server-timeout"] == expected
+    assert captured[-1].headers["x-goog-api-key"] == "test-key-placeholder"
+
+
+def test_gemini_400_keeps_status_and_message_for_diagnosis():
+    models = FakeModels([errors.ClientError(400, {"error": {"code": 400, "message": "Deadline too short",
+                                                            "status": "INVALID_ARGUMENT"}})])
+    llm = GeminiLLM(None, "m", client=SimpleNamespace(models=models))
+    with pytest.raises(LLMError) as exc:
+        llm.generate(system="s", messages=[Message(role="user", text="x")], tools=TOOLS, timeout_s=5)
+    assert "INVALID_ARGUMENT" in str(exc.value) and "Deadline too short" in str(exc.value)

@@ -7,6 +7,7 @@ Clave de corrección: el contenido que devuelve el modelo se reenvía INTACTO en
 from __future__ import annotations
 
 import itertools
+import math
 from typing import Any, Literal
 
 import httpx
@@ -15,6 +16,10 @@ from google.genai import errors, types
 
 from .base import LLMError, LLMResponse, Message, ToolCall, ToolSpec, Usage
 
+# El SDK manda el timeout como deadline del servidor (header X-Server-Timeout = ceil(timeout)). Con 9 s la API
+# respondió 400 inmediato en todas las llamadas (live-smoke 3/3); con 20 s funcionó (1/3 y 2/3). Por eso el
+# deadline del servidor nunca baja de 10 s, mientras el tope real lo pone el cliente (httpx) con el valor del agente.
+MIN_SERVER_TIMEOUT_S = 10
 _BLOCKED = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION", "IMAGE_SAFETY"}
 _ids = itertools.count(1)
 
@@ -73,8 +78,10 @@ class GeminiLLM:
             automatic_continuation=False,  # 1 llamada = 1 petición HTTP; si no, A5 se rompe (hallazgo H3)
             thinking_config=types.ThinkingConfig(thinking_level=self.thinking_level),
             max_output_tokens=2048,
-            http_options=types.HttpOptions(timeout=max(1000, int(timeout_s * 1000)),
-                                           retry_options=types.HttpRetryOptions(attempts=1)),
+            http_options=types.HttpOptions(
+                timeout=max(1000, int(timeout_s * 1000)),
+                headers={"X-Server-Timeout": str(max(MIN_SERVER_TIMEOUT_S, math.ceil(timeout_s)))},
+                retry_options=types.HttpRetryOptions(attempts=1)),
         )
 
     # --- llamada -----------------------------------------------------------------------------------------
@@ -95,7 +102,8 @@ class GeminiLLM:
                 raise LLMError("server_error", f"{code} {status}".strip(), retryable=True) from exc
             if code in (401, 403):
                 raise LLMError("auth", str(code)) from exc
-            raise LLMError("bad_request", str(code)) from exc
+            detail = f"{code} {getattr(exc, 'status', '') or ''} {(getattr(exc, 'message', '') or '')[:120]}"
+            raise LLMError("bad_request", " ".join(detail.split())) from exc
         except httpx.TimeoutException as exc:
             # generate_content no tiene efectos de nuestro lado: reintentar es seguro si queda tiempo.
             raise LLMError("timeout", type(exc).__name__, retryable=True) from exc
