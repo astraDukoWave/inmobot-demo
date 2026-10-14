@@ -70,6 +70,7 @@ class GeminiLLM:
             tool_config=types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode=mode))
             if declarations else None,
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+            automatic_continuation=False,  # 1 llamada = 1 petición HTTP; si no, A5 se rompe (hallazgo H3)
             thinking_config=types.ThinkingConfig(thinking_level=self.thinking_level),
             max_output_tokens=2048,
             http_options=types.HttpOptions(timeout=max(1000, int(timeout_s * 1000)),
@@ -98,7 +99,12 @@ class GeminiLLM:
             raise LLMError("timeout", type(exc).__name__) from exc
         except httpx.HTTPError as exc:
             raise LLMError("network", type(exc).__name__, retryable=True) from exc
-        return self.parse(response)
+        except ValueError as exc:  # respuesta 200 que no es JSON o no valida contra el SDK
+            raise LLMError("bad_response", type(exc).__name__, retryable=True) from exc
+        try:
+            return self.parse(response)
+        except (ValueError, AttributeError, TypeError) as exc:
+            raise LLMError("bad_response", type(exc).__name__, retryable=True) from exc
 
     def parse(self, response: types.GenerateContentResponse) -> LLMResponse:
         um = response.usage_metadata
