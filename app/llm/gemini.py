@@ -91,12 +91,14 @@ class GeminiLLM:
             if code == 429:
                 raise LLMError("rate_limited", str(code), retryable=True) from exc
             if code >= 500:
-                raise LLMError("server_error", str(code), retryable=True) from exc
+                status = getattr(exc, "status", None) or ""
+                raise LLMError("server_error", f"{code} {status}".strip(), retryable=True) from exc
             if code in (401, 403):
                 raise LLMError("auth", str(code)) from exc
             raise LLMError("bad_request", str(code)) from exc
         except httpx.TimeoutException as exc:
-            raise LLMError("timeout", type(exc).__name__) from exc
+            # generate_content no tiene efectos de nuestro lado: reintentar es seguro si queda tiempo.
+            raise LLMError("timeout", type(exc).__name__, retryable=True) from exc
         except httpx.HTTPError as exc:
             raise LLMError("network", type(exc).__name__, retryable=True) from exc
         except ValueError as exc:  # respuesta 200 que no es JSON o no valida contra el SDK

@@ -26,6 +26,7 @@ MSG_LEAK = ("No puedo compartir mis instrucciones internas, pero con gusto te ay
 MSG_DONE = "Listo. ¿Te ayudo con algo más?"
 MAX_CALLS_PER_ROUND = 5
 MIN_CALL_BUDGET_S = 2.0
+FIRST_ATTEMPT_CAP_S = 9.0
 RETRY_EMPTY = {"MALFORMED_FUNCTION_CALL", "UNEXPECTED_TOOL_CALL", "OTHER", "EMPTY"}
 
 
@@ -40,6 +41,7 @@ class TurnResult:
     rounds: int = 0
     latency_ms: int = 0
     fallback: str | None = None
+    errors: list[str] = field(default_factory=list)  # errores del proveedor (tipo y código, sin contenido)
 
 
 class Agent:
@@ -57,22 +59,32 @@ class Agent:
         self.clock = clock
         self.sleep = sleep
 
-    def _generate(self, history: list[Message], deadline: float, tool_choice: str = "auto"):
-        """Una llamada con el tiempo que queda; un solo reintento si el error es reintentable y hay margen."""
+    def _generate(self, history: list[Message], deadline: float, errors: list[str], tool_choice: str = "auto"):
+        """Una llamada con tope de tiempo; si falla de forma reintentable, un reintento con lo que quede del turno.
+
+        El primer intento se limita a FIRST_ATTEMPT_CAP_S para que una llamada colgada no consuma todo el turno
+        (live-smoke 2/3: una sola llamada se llevó 19.2 s y no quedó margen para reintentar).
+        """
         last = LLMError("unreachable")
         for attempt in (1, 2):
             remaining = deadline - self.clock()
             if remaining < MIN_CALL_BUDGET_S:
                 raise LLMError("deadline", "sin tiempo para llamar al modelo")
+            timeout = remaining - 0.5
+            if attempt == 1:
+                timeout = min(timeout, FIRST_ATTEMPT_CAP_S)
+            started = self.clock()
             try:
                 return self.llm.generate(system=self.system_prompt, messages=history, tools=self.tools,
-                                         timeout_s=remaining - 0.5, tool_choice=tool_choice)
+                                         timeout_s=timeout, tool_choice=tool_choice)
             except LLMError as exc:
                 last = exc
+                errors.append(f"{exc} @{int((self.clock() - started) * 1000)}ms")
                 if attempt == 2 or not exc.retryable or deadline - self.clock() < MIN_CALL_BUDGET_S + 1.5:
                     raise
-                self.sleep(0.8)
+                self.sleep(0.5)
             except Exception as exc:  # cualquier sorpresa del SDK se trata como fallo del proveedor
+                errors.append(f"unexpected: {type(exc).__name__}")
                 raise LLMError("unexpected", type(exc).__name__) from exc
         raise last
 
@@ -93,7 +105,7 @@ class Agent:
         for round_no in range(1, self.max_rounds + 1):
             result.rounds = round_no
             try:
-                response = self._generate(session.history, deadline)
+                response = self._generate(session.history, deadline, result.errors)
             except LLMError as exc:
                 return self._finish(session, result, start, MSG_PROVIDER, exc.kind, cards, actions,
                                     offer_whatsapp=True)
@@ -131,7 +143,7 @@ class Agent:
         else:
             # Se acabaron las rondas: una última llamada sin tools para cerrar con texto.
             try:
-                response = self._generate(session.history, deadline, tool_choice="none")
+                response = self._generate(session.history, deadline, result.errors, tool_choice="none")
                 result.usage = result.usage + response.usage
                 self.budget.consume(response.usage.total)
                 if response.message.text and not response.message.tool_calls:
@@ -173,6 +185,6 @@ class Agent:
             "latency_ms": result.latency_ms, "rounds": result.rounds, "tools": result.tool_calls,
             "tokens_in": result.usage.input_tokens, "tokens_out": result.usage.output_tokens,
             "tokens_thinking": result.usage.thinking_tokens, "cost_usd_est": cost,
-            "cards": [c["id"] for c in result.cards], "fallback": fallback_kind,
+            "cards": [c["id"] for c in result.cards], "fallback": fallback_kind, "errors": result.errors,
         }))
         return result

@@ -81,3 +81,21 @@ def test_empty_model_response_is_not_stored(catalog, leads):
     session = Session(id="s1")
     result = agent.run_turn(session, "hola")
     assert result.fallback == "empty:SAFETY" and session.history[-1].role == "assistant"
+
+
+def test_first_attempt_is_capped_and_retry_gets_the_rest(catalog, leads):
+    now = [0.0]
+
+    def clock():
+        return now[0]
+
+    def slow_failure(messages):
+        now[0] += 9.0  # la primera llamada se cuelga hasta su tope
+        raise LLMError("timeout", "ReadTimeout", retryable=True)
+
+    agent = make_agent(catalog, leads, [slow_failure, fake.text("¡Hola!")], clock=clock)
+    result = agent.run_turn(Session(id="s1"), "hola")
+    first, second = agent.llm.calls
+    assert first["timeout_s"] == 9.0 and 10.0 <= second["timeout_s"] <= 11.0
+    assert result.reply == "¡Hola!" and result.fallback is None
+    assert result.errors and result.errors[0].startswith("timeout")
