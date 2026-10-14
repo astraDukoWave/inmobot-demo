@@ -38,6 +38,11 @@ def _bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _thinking_level(raw: str | None) -> str:
+    level = (raw or "low").strip().lower()
+    return level if level in {"minimal", "low", "medium", "high"} else "low"
+
+
 def _str(name: str, default: str | None = None) -> str | None:
     raw = os.getenv(name)
     return raw.strip() if raw and raw.strip() else default
@@ -84,7 +89,7 @@ class Settings:
             llm_provider=(_str("LLM_PROVIDER", "gemini") or "gemini").lower(),
             gemini_api_key=_str("GEMINI_API_KEY") or _str("GOOGLE_API_KEY"),
             gemini_model=_str("GEMINI_MODEL", cls.gemini_model) or cls.gemini_model,
-            gemini_thinking_level=(_str("GEMINI_THINKING_LEVEL", "low") or "low").lower(),
+            gemini_thinking_level=_thinking_level(_str("GEMINI_THINKING_LEVEL", "low")),
             anthropic_api_key=_str("ANTHROPIC_API_KEY"),
             anthropic_model=_str("ANTHROPIC_MODEL", cls.anthropic_model) or cls.anthropic_model,
             admin_token=_str("ADMIN_TOKEN"),
