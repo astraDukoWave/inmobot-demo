@@ -1,5 +1,5 @@
 # Plan: InmoBot S01
-plan_id: INMOBOT-S01-PLAN-01 · Spec: `docs/specs/INMOBOT_S01_DESIGN-SPEC_v1.0_APPROVED.md` @ `2202980`
+plan_id: INMOBOT-S01-PLAN-01 · estado: APPROVED (Jonathan, 2026-10-13) · Spec: `docs/specs/INMOBOT_S01_DESIGN-SPEC_v1.0_APPROVED.md` @ `2202980`
 Lane: High-risk · Ventana única (Claude Code en la nube) · Revisión 00:30 · corte 01:30
 
 ## Contexto de dominio (con procedencia)
