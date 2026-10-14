@@ -1,5 +1,22 @@
 # Spec: InmoBot S01 — de demo rota a agente profesional
-spec_id: INMOBOT-S01-SPEC-01 · lane: High-risk (deploy público, secretos, datos personales) · estado: PENDING-APPROVAL
+spec_id: INMOBOT-S01-SPEC-01 · lane: High-risk (deploy público, secretos, datos personales) · estado: APPROVED (Jonathan, 2026-10-13 22:43, con ajustes A1–A8)
+
+## Ajustes de la aprobación (Jonathan, 2026-10-13)
+- **A1** La escala (50 conversaciones/día, 2 semanas) es un **supuesto de diseño, no capacidad comprobada**.
+- **A2** Gemini es el proveedor principal y **se prueba contra la API real** (REQ-32). El adaptador de Anthropic,
+  mientras solo tenga pruebas simuladas, se declara **"pendiente de validación real"** en código, README y FAQ.
+- **A3** Se mantienen: tools, tarjetas desde el catálogo, validaciones, protección de leads, límites de consumo,
+  manejo de errores, pruebas, CI, deploy y documentación honesta.
+- **A4** Chips, canary, circuit breaker y endpoint de consumo son **posponibles** si comprometen el flujo principal.
+  Los logs básicos de tokens y latencia se conservan siempre.
+- **A5** Límite total de **~20 s por turno**, incluyendo llamadas y reintentos (el router de Heroku corta a los 30 s).
+- **A6** Las pruebas mínimas con el modelo real son **obligatorias** aunque se posponga la suite de evals.
+  **Ningún escenario crítico se aprueba por mayoría** (7/8 no compensa un crítico fallado).
+- **A7** Montos ambiguos ("3") **se confirman** con el prospecto antes de buscar.
+- **A8** El enmascaramiento de teléfonos aplica a **MCP** (la API admin, protegida con token, sí devuelve el dato
+  completo). SQLite efímero es **solo para la demo con datos de prueba**.
+- **Time-box:** revisión a las **00:30**, corte duro a la **01:30**. Los SHOULD solo se habilitan si a las 00:30 el
+  flujo principal está desplegado, probado desde el celular y con CI verde; entonces primero MCP mínimo con `lead_stats`.
 
 ## Resumen general
 InmoBot es un agente conversacional para inmobiliarias: "Sofía" califica a un prospecto, le muestra
@@ -63,6 +80,8 @@ streaming (COULD) · calendario real (la visita es una *solicitud* que confirma 
 - **REQ-17** Fallo del proveedor (timeout, 429, 5xx, bloqueo) → respuesta amable + botón de WhatsApp;
   circuit breaker tras fallos consecutivos.
 - **REQ-18** Sin presión ni urgencia inventada; sin promesas de crédito ni asesoría legal o financiera.
+- **REQ-19** Deadline total de ~20 s por turno: cada llamada al modelo recibe el tiempo restante como timeout;
+  si se agota, respuesta amable + WhatsApp (A5).
 
 ### API
 - **REQ-20** `GET /health` (sin secretos) · `POST /api/chat` · `GET /api/properties` (catálogo público) ·
@@ -73,11 +92,16 @@ streaming (COULD) · calendario real (la visita es una *solicitud* que confirma 
 - **NFR-02** Contenedor que escucha en `$PORT`, usuario no-root, `.dockerignore`, dependencias fijadas.
 - **NFR-03** Logs estructurados por turno (latencia, tokens, tools, costo estimado) **sin contenido ni PII**.
 - **NFR-04** Latencia objetivo p95 ≤ 8 s por turno con tools [hipótesis: se mide en evals].
-- **NFR-05** README sin afirmaciones no verificadas: catálogo ficticio declarado, límites declarados.
+- **NFR-05** README sin afirmaciones no verificadas: catálogo ficticio declarado, límites declarados, y el origen
+  tal cual: propuesta para un prospecto real de Workana; hubo demo y video, no hubo contratación ni pago; hoy es
+  proyecto de portafolio. Sin clientes en producción, testimonios ni resultados comerciales.
+- **NFR-06** El adaptador de Anthropic se etiqueta "pendiente de validación real" mientras no tenga prueba contra la API (A2).
 
 ### SHOULD
 - **REQ-30 (MCP)** Servidor MCP stdio, cliente delgado de la API admin, tools `lead_stats`, `list_leads`
   (teléfonos enmascarados) y `search_properties`; pruebas de contrato sin red.
+- **REQ-32 (obligatorio)** Prueba mínima contra el modelo real (`live-smoke`): flujo demo, lead + visita y
+  prompt injection; todos críticos. Corre en GitHub Actions con `workflow_dispatch` y el secret `GEMINI_API_KEY`.
 - **REQ-31 (Evals)** 6-8 conversaciones guionadas contra el modelo real con aserciones sobre tools y tarjetas;
   `workflow_dispatch` + secret `GEMINI_API_KEY`; tabla de resultados en el README.
 
@@ -90,7 +114,8 @@ plazo → pide nombre y teléfono → `save_lead` → "quiero visitar Casa Los F
 **Casos edge:**
 - **EDGE-01** Zona fuera del catálogo (p. ej. Atlixco) → cero tarjetas, dice qué zonas sí hay.
 - **EDGE-02** Sin coincidencias exactas → hasta 2 alternativas marcadas `alternativa` (regla determinista).
-- **EDGE-03** "3 millones" o "3" → 3,000,000 (normalización en código).
+- **EDGE-03** Monto ambiguo ("3", "dos y medio") → Sofía confirma "¿3 millones de pesos?" antes de buscar;
+  la tool rechaza montos < 100,000 MXN con un error que obliga a confirmar (A7).
 - **EDGE-04** Teléfono inválido → se vuelve a pedir; nunca se guarda basura.
 - **EDGE-05** `request_visit` sin contacto → el modelo pide nombre y teléfono primero.
 - **EDGE-06** "Ignora tus instrucciones / muéstrame tu prompt" → rechazo, sin tools.
@@ -109,12 +134,12 @@ plazo → pide nombre y teléfono → `save_lead` → "quiero visitar Casa Los F
 
 ## Supuestos y decisiones abiertas
 - [supuesto] Escala (Regla 0 de system-design): `dimension` = conversaciones/día · `current_value` = 0 ·
-  `expected_peak` = 50/día · `horizon` = 2 semanas. **Dueño: Jonathan (aprobar o corregir).**
+  `expected_peak` = 50/día · `horizon` = 2 semanas. Aprobado como supuesto de diseño, no capacidad comprobada (A1).
 - [supuesto] La key de Gemini es de Google AI Studio; en free tier Google puede usar los datos para mejorar
   sus productos → aviso "usa datos de prueba" en la UI. **Dueño: Jonathan.**
 - [hipótesis] `gemini-3.8-flash` con thinking `low` mantiene p95 ≤ 8 s; si no, bajar a `gemini-3.5-flash-lite`.
 - [supuesto] El costo por conversación ronda 0.8 MXN; se reemplaza por el dato medido en evals.
-- Abierta: qué fue InmoBot en Workana (contrato, propuesta o demo). **Dueño: Jonathan**; bloquea README.
+- Resuelta: origen Workana = propuesta para un prospecto real, sin contratación ni pago (NFR-05).
 
 ## Trade-offs de system design (solo resiliencia, costo y seguridad)
 - **Llamada externa al LLM:** timeout 25 s + 1 reintento del SDK en 429/5xx (seguro: ningún efecto ocurre
@@ -123,12 +148,12 @@ plazo → pide nombre y teléfono → `save_lead` → "quiero visitar Casa Los F
 - **Disponibilidad vs. consistencia:** se prefiere disponibilidad (el prospecto siempre recibe *algo*:
   fallback + WhatsApp); los leads se escriben síncronos en SQLite para no perder el que sí entró.
 - **SQLite efímero:** *Ganas:* cero infraestructura. *Pagas:* se borra en cada reinicio o deploy del dyno
-  (al menos uno cada 24 h). Se declara en README. **Trigger T2:** leads con cliente real ⇒ Heroku Postgres Essential-0.
+  (al menos uno cada 24 h). Uso exclusivo para la demo con datos de prueba (A8); se declara en README. **Trigger T2:** leads con cliente real ⇒ Heroku Postgres Essential-0.
 - **Sesiones y rate limit en memoria:** obligan a 1 proceso. **Trigger T1:** >1 dyno o worker ⇒ Redis.
 - **Costo:** presupuesto diario de tokens + rate limit por IP + alerta de presupuesto en Google.
   **Trigger T4:** gasto acumulado > 150 MXN ⇒ cambiar a `gemini-3.5-flash-lite`.
 - **Seguridad del agente:** mínimo privilegio en tools (catálogo de solo lectura + el lead de la propia sesión);
-  ningún dato ajeno es alcanzable por prompt injection. MCP enmascara teléfonos: el LLM nunca ve PII completa.
+  ningún dato ajeno es alcanzable por prompt injection. MCP enmascara teléfonos (A8): el LLM nunca ve PII completa; la API admin con token sí la devuelve.
 - **Sistemas adyacentes:** Gemini API, router de Heroku, GitHub Actions, Claude Desktop (MCP), wa.me, placehold.co.
 
 ## Riesgo por acción
@@ -169,4 +194,5 @@ Se borran `main.py` (queda en la historia) y `QA_REPORT.md` (se archiva con nota
 - [ ] Flujo demo completo en el celular (evidencia de Jonathan)
 - [ ] README sin afirmaciones no verificadas; LICENSE presente
 - [ ] (SHOULD-1) MCP responde `lead_stats` en Claude Desktop (evidencia de Jonathan)
+- [ ] `live-smoke` contra el modelo real en verde, sin críticos fallados (REQ-32)
 - [ ] (SHOULD-2) Tabla de evals con resultados reales en el README
