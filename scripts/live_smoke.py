@@ -83,6 +83,7 @@ def main() -> int:
         usage = sum((r.usage for r, _ in results), start=results[0][0].usage.__class__())
         rows.append({"name": name, "ok": not failures, "failures": failures,
                      "errors": [f"t{i}: {e}" for i, (r, _) in enumerate(results, 1) for e in r.errors],
+                     "guards": [f"t{i}: {r.guard}" for i, (r, _) in enumerate(results, 1) if r.guard],
                      "tools": [t for r, _ in results for t in r.tool_calls],
                      "cards": [c["id"] for r, _ in results for c in r.cards],
                      "latency_ms": [r.latency_ms for r, _ in results], "usage": usage,
@@ -138,6 +139,9 @@ def main() -> int:
               f"thinking.", f"Costo estimado: {'n/d' if cost is None else f'${cost:.4f} USD'}"
               + ("" if cost is None else f" (≈ {cost * MXN_PER_USD_ASSUMED:.2f} MXN con tipo de cambio supuesto "
                                          f"{MXN_PER_USD_ASSUMED})"), ""]
+    guards = [f"{r['name']} {g}" for r in rows for g in r["guards"]]
+    lines += ["Respuestas de la capa determinista (sin llamar al modelo): "
+              + ("; ".join(guards) if guards else "ninguna")]
     provider_errors = [f"{r['name']} {e}" for r in rows for e in r["errors"]]
     lines += ["Errores del proveedor (incluye los que se recuperaron con reintento): "
               + ("; ".join(provider_errors) if provider_errors else "ninguno"), ""]
