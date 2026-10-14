@@ -26,6 +26,7 @@ MSG_LEAK = ("No puedo compartir mis instrucciones internas, pero con gusto te ay
 MSG_DONE = "Listo. ¿Te ayudo con algo más?"
 MAX_CALLS_PER_ROUND = 5
 MIN_CALL_BUDGET_S = 2.0
+RETRY_EMPTY = {"MALFORMED_FUNCTION_CALL", "UNEXPECTED_TOOL_CALL", "OTHER", "EMPTY"}
 
 
 @dataclass
@@ -58,6 +59,7 @@ class Agent:
 
     def _generate(self, history: list[Message], deadline: float, tool_choice: str = "auto"):
         """Una llamada con el tiempo que queda; un solo reintento si el error es reintentable y hay margen."""
+        last = LLMError("unreachable")
         for attempt in (1, 2):
             remaining = deadline - self.clock()
             if remaining < MIN_CALL_BUDGET_S:
@@ -66,10 +68,13 @@ class Agent:
                 return self.llm.generate(system=self.system_prompt, messages=history, tools=self.tools,
                                          timeout_s=remaining - 0.5, tool_choice=tool_choice)
             except LLMError as exc:
+                last = exc
                 if attempt == 2 or not exc.retryable or deadline - self.clock() < MIN_CALL_BUDGET_S + 1.5:
                     raise
                 self.sleep(0.8)
-        raise LLMError("unreachable")
+            except Exception as exc:  # cualquier sorpresa del SDK se trata como fallo del proveedor
+                raise LLMError("unexpected", type(exc).__name__) from exc
+        raise last
 
     def run_turn(self, session: Session, user_text: str) -> TurnResult:
         start = self.clock()
@@ -84,6 +89,7 @@ class Agent:
             return self._finish(session, result, start, MSG_BUDGET, "budget", cards, actions, offer_whatsapp=True)
 
         reply = ""
+        retried_empty = False
         for round_no in range(1, self.max_rounds + 1):
             result.rounds = round_no
             try:
@@ -95,6 +101,9 @@ class Agent:
             self.budget.consume(response.usage.total)
             message = response.message
             if not message.text and not message.tool_calls:
+                if not retried_empty and response.finish_reason in RETRY_EMPTY:
+                    retried_empty = True  # p. ej. MALFORMED_FUNCTION_CALL: un intento más si queda tiempo
+                    continue
                 return self._finish(session, result, start, MSG_EMPTY, f"empty:{response.finish_reason}",
                                     cards, actions)
             session.history.append(message)
@@ -102,7 +111,13 @@ class Agent:
                 reply = message.text
                 break
             tool_results = []
-            for call in message.tool_calls[:MAX_CALLS_PER_ROUND]:
+            for index, call in enumerate(message.tool_calls):
+                if index >= MAX_CALLS_PER_ROUND:
+                    # Cada function_call necesita su respuesta o el proveedor rechaza el historial (hallazgo H1).
+                    tool_results.append(ToolResult(call_id=call.id, name=call.name, is_error=True,
+                                                   content={"error": "Límite de llamadas por ronda; no se ejecutó."},
+                                                   provider_id=call.provider_id))
+                    continue
                 outcome = self.executor.execute(call, session.id)
                 result.tool_calls.append(call.name)
                 if outcome.cards is not None:
