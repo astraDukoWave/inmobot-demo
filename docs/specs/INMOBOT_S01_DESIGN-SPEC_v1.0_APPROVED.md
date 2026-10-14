@@ -142,9 +142,10 @@ plazo → pide nombre y teléfono → `save_lead` → "quiero visitar Casa Los F
 - Resuelta: origen Workana = propuesta para un prospecto real, sin contratación ni pago (NFR-05).
 
 ## Trade-offs de system design (solo resiliencia, costo y seguridad)
-- **Llamada externa al LLM:** timeout 25 s + 1 reintento del SDK en 429/5xx (seguro: ningún efecto ocurre
-  antes de que el modelo responda); circuit breaker 3 fallos/60 s → abierto 30 s. *Ganas:* no se apilan
-  requests contra un proveedor caído. *Pagas:* durante 30 s todos reciben el fallback.
+- **Llamada externa al LLM:** deadline total de ~20 s por turno (A5): cada llamada recibe como timeout el tiempo
+  que queda del turno, y solo se reintenta una vez en 429/5xx si todavía queda margen (seguro: ningún efecto ocurre
+  antes de que el modelo responda). Circuit breaker posponible (A4). *Ganas:* respuesta antes del corte de 30 s
+  del router de Heroku. *Pagas:* turnos largos terminan en fallback en vez de esperar.
 - **Disponibilidad vs. consistencia:** se prefiere disponibilidad (el prospecto siempre recibe *algo*:
   fallback + WhatsApp); los leads se escriben síncronos en SQLite para no perder el que sí entró.
 - **SQLite efímero:** *Ganas:* cero infraestructura. *Pagas:* se borra en cada reinicio o deploy del dyno
@@ -153,7 +154,9 @@ plazo → pide nombre y teléfono → `save_lead` → "quiero visitar Casa Los F
 - **Costo:** presupuesto diario de tokens + rate limit por IP + alerta de presupuesto en Google.
   **Trigger T4:** gasto acumulado > 150 MXN ⇒ cambiar a `gemini-3.5-flash-lite`.
 - **Seguridad del agente:** mínimo privilegio en tools (catálogo de solo lectura + el lead de la propia sesión);
-  ningún dato ajeno es alcanzable por prompt injection. MCP enmascara teléfonos (A8): el LLM nunca ve PII completa; la API admin con token sí la devuelve.
+  ningún dato ajeno es alcanzable por prompt injection. MCP enmascara teléfonos (A8): el modelo que consulta por MCP
+  no recibe teléfonos completos; la API admin con token sí los devuelve. La conversación con Sofía sí envía al
+  proveedor lo que el prospecto escribe (incluido su teléfono): por eso la demo usa solo datos de prueba.
 - **Sistemas adyacentes:** Gemini API, router de Heroku, GitHub Actions, Claude Desktop (MCP), wa.me, placehold.co.
 
 ## Riesgo por acción
@@ -175,7 +178,8 @@ Rollback: `heroku releases` → `heroku rollback vNN`. Verify por PR antes de ca
 | Métrica | Fuente | Baseline | Review | Decisión |
 |---|---|---|---|---|
 | Flujo demo completo en vivo (sí/no) | Ensayo 14-oct 09:00 | No corre | 14-oct 09:30 | continuar / revisar / parar |
-| Evals que pasan (n/8) | `evals/` en Actions | — | 14-oct 09:30 | ≥ 7/8 continuar |
+| Escenarios críticos que pasan | `live-smoke` / `evals/` en Actions | — | 14-oct 09:30 | 100% requerido: un crítico fallado = parar (A6) |
+| Escenarios no críticos que pasan (n/total) | `evals/` en Actions | — | 14-oct 09:30 | informativo; < 75% ⇒ revisar |
 | Tokens y costo por conversación | `/api/admin/usage`, evals | — | 15-oct | > 2 MXN ⇒ revisar modelo |
 | p95 de latencia por turno | logs / evals | — | 15-oct | > 8 s ⇒ revisar modelo |
 
