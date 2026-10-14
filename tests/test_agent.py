@@ -46,12 +46,16 @@ def test_retryable_error_is_retried_once(catalog, leads):
     assert agent.run_turn(Session(id="s1"), "hola").reply == "¡Hola!"
 
 
-def test_deadline_stops_the_turn(catalog, leads):
+def test_late_tool_response_is_discarded_before_any_tool_runs(catalog, leads):
+    # Antes: la respuesta con tools que llegaba a los 19.5 s ejecutaba las tools. Ahora se descarta completa (A5).
     ticks = iter([0.0, 0.0, 19.5, 19.6, 19.7, 19.8, 19.9])
     agent = make_agent(catalog, leads, [fake.tool("search_properties", {"zone": "Cholula"}), fake.text("x")],
                        clock=lambda: next(ticks))
-    result = agent.run_turn(Session(id="s1"), "hola")
-    assert result.fallback == "deadline" and result.reply == MSG_PROVIDER
+    session = Session(id="s1")
+    result = agent.run_turn(session, "hola")
+    assert result.fallback == "late_response" and result.reply == MSG_PROVIDER
+    assert result.tool_calls == [] and result.cards == []
+    assert [m.role for m in session.history] == ["user", "assistant"]
 
 
 def test_max_rounds_closes_without_tools(catalog, leads):
