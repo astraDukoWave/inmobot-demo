@@ -49,7 +49,10 @@ Vienen del Verify Report del PR #2 (`docs/reviews/`).
   ```
 - **Si crees que la key de Gemini se filtró:**
   1. Bórrala en https://aistudio.google.com/apikey y crea otra.
-  2. Cárgala con el bloque `read -s` del paso 3.
+  2. Cárgala con el bloque del paso 3 (portapapeles filtrado).
+
+> **Antes de cada bloque:** todos los comandos usan la variable `APP`. Una terminal nueva **no** la conserva (incidente 01).
+> Por eso cada bloque empieza con `APP=inmobot-sofia`. Si tu app se llama `inmobot-sofia-jg`, cambia esa línea.
 
 ## 0. Requisitos (una sola vez)
 
@@ -95,12 +98,14 @@ heroku create "$APP" --stack container
 Ninguna key se pega en el chat ni se escribe en archivos del repo.
 
 ```bash
+APP=inmobot-sofia
 heroku config:set LLM_PROVIDER=gemini GEMINI_MODEL=gemini-3.8-flash TRUST_PROXY=true DAILY_TOKEN_BUDGET=800000 -a "$APP"
 
-# La key de Gemini se teclea sin que se vea ni quede en el historial:
-printf "Pega tu GEMINI_API_KEY y presiona Enter: "; read -s GEMINI_KEY; echo
-heroku config:set GEMINI_API_KEY="$GEMINI_KEY" -a "$APP" > /dev/null && echo "GEMINI_API_KEY guardada"
-unset GEMINI_KEY
+# Key de Gemini: cópiala con el botón de copiar de https://aistudio.google.com/apikey y corre esto.
+# Se filtran los caracteres que no son de una key de Google (el pegado en la terminal agregó basura en el
+# incidente 01), nunca se muestra y después se vacía el portapapeles:
+heroku config:set GEMINI_API_KEY="$(pbpaste | LC_ALL=C tr -cd 'A-Za-z0-9_-')" -a "$APP" > /dev/null && echo "GEMINI_API_KEY guardada"
+pbcopy < /dev/null
 
 # Token de admin aleatorio (para /api/admin/* y para el servidor MCP):
 heroku config:set ADMIN_TOKEN="$(openssl rand -hex 24)" -a "$APP" > /dev/null && echo "ADMIN_TOKEN guardado"
@@ -122,6 +127,7 @@ Nunca corras `heroku config` ni `heroku config:get` sin filtro mientras comparte
 ## 4. Deploy
 
 ```bash
+APP=inmobot-sofia
 git push heroku main:main
 ```
 - **Verifica:** la salida termina con `Verifying deploy... done.` La primera construcción tarda unos 2 a 4 minutos.
@@ -135,6 +141,7 @@ git push heroku main:main
 ## 5. Pruebas de humo
 
 ```bash
+APP=inmobot-sofia
 URL=$(heroku apps:info -a "$APP" | awk '/Web URL/ {print $3}'); URL=${URL%/}; echo "$URL"
 curl -s "$URL/health"; echo
 curl -s -o /dev/null -w "admin sin token: %{http_code}\n" "$URL/api/admin/leads"
@@ -161,6 +168,7 @@ curl -s -H "Authorization: Bearer $(heroku config:get ADMIN_TOKEN -a "$APP")" "$
 ## Rollback
 
 ```bash
+APP=inmobot-sofia
 heroku releases -a "$APP"          # lista v1, v2, ...
 heroku rollback vNN -a "$APP"      # NN = la versión anterior que sí funcionaba
 ```
@@ -169,6 +177,7 @@ heroku rollback vNN -a "$APP"      # NN = la versión anterior que sí funcionab
 ## Apagar después de la demostración (opcional, ahorra créditos)
 
 ```bash
+APP=inmobot-sofia
 heroku ps:scale web=0 -a "$APP"    # apaga sin borrar la app
 heroku ps:scale web=1 -a "$APP"    # la vuelve a encender
 ```
