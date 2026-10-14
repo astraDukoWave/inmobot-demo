@@ -32,4 +32,15 @@ jobs:
         run: python scripts/live_smoke.py --report smoke-report.md
       - name: Publish report
         if: always()
-        run: test -f smoke-report.md && cat smoke-report.md >> "$GITHUB_STEP_SUMMARY" || true
+        run: |
+          if [ ! -f smoke-report.md ]; then echo "::error title=live-smoke::no se generó reporte"; exit 0; fi
+          cat smoke-report.md >> "$GITHUB_STEP_SUMMARY"
+          # También como anotaciones: se leen por la API de check-runs sin descargar logs.
+          python - <<'PY'
+          from pathlib import Path
+          body = Path("smoke-report.md").read_text(encoding="utf-8")
+          chunks = [body[i:i + 2000] for i in range(0, len(body), 2000)][:10]
+          for n, chunk in enumerate(chunks, 1):
+              esc = chunk.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::notice title=live-smoke {n}/{len(chunks)}::{esc}")
+          PY
