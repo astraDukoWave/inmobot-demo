@@ -5,7 +5,7 @@
   - Pestaña 1: la URL de la app.
   - Pestaña 2: el repo en GitHub.
   - Terminal con `heroku logs --tail -a inmobot-sofia`.
-- **Celular:** la URL abierta, para que la persona que evalúa pueda escribir ella misma.
+- **Celular:** la URL abierta, para que quien vea la demostración pueda escribir.
 - **Calentamiento:** manda un "hola" 2 o 3 minutos antes, para confirmar que el modelo responde.
 - **Nunca en pantalla:** `heroku config` sin filtro ni `heroku config:get` solo, porque muestran secretos.
 - **Prepara la variable de la URL:**

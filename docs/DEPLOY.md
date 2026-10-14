@@ -166,7 +166,7 @@ heroku rollback vNN -a "$APP"      # NN = la versión anterior que sí funcionab
 ```
 **Verifica:** `curl -s "$URL/health"` vuelve a responder `ok`.
 
-## Apagar después de la entrevista (opcional, ahorra créditos)
+## Apagar después de la demostración (opcional, ahorra créditos)
 
 ```bash
 heroku ps:scale web=0 -a "$APP"    # apaga sin borrar la app

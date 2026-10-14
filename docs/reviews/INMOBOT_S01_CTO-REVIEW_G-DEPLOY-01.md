@@ -48,7 +48,7 @@ El límite real es el spend cap mensual del proyecto en AI Studio, que Google ma
 
 ## Decisiones humanas registradas
 - **Merge del PR #3:** autorizado por Jonathan sobre `913e021` (merge commit → `main` @ `dcce6ff`).
-- **WhatsApp:** Jonathan usa su propio número solo durante la demo y lo configura él como config var. **El número no está en el repo.** Lo retira después de la entrevista con `heroku config:unset WHATSAPP_NUMBER`.
+- **WhatsApp:** Jonathan usa su propio número solo durante la demo y lo configura él como config var. **El número no está en el repo.** Lo retira después de la demostración con `heroku config:unset WHATSAPP_NUMBER`.
 - **Gasto:**
   - `DAILY_TOKEN_BUDGET=800000`.
   - Alerta de presupuesto en Google Cloud.

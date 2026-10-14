@@ -14,7 +14,7 @@
 - Deploy en Heroku y prueba en el celular, siguiendo `docs/DEPLOY.md` (pasos 1–6).
 - Spend cap mensual en AI Studio y alerta de presupuesto en Google Cloud.
 - Grabar el video de respaldo de 2 minutos (`docs/DEMO.md`, plan B).
-- Después de la entrevista: `heroku config:unset WHATSAPP_NUMBER`, y apagar o bajar el tope si ya no se usa.
+- Después de la demostración: `heroku config:unset WHATSAPP_NUMBER`, y apagar o bajar el tope si ya no se usa.
 
 ## Desviaciones
 - **DV-01:** el PR #1 se mergeó sin CI. Disposición: ratify-with-reason (Jonathan, 2026-10-13), solo para el PR #1.
