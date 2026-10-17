@@ -45,7 +45,25 @@ npm run finish    # → out/InmoBot-Sofia-demo.mp4 y out/InmoBot-Sofia-poster.jp
 En el contenedor donde se hizo el video, la ruta del navegador era `/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`.
 
 ## Verificación de la reproducción
-Pendiente: se documenta en el siguiente commit de esta rama.
+**Fecha:** 2026-10-17.
+
+**Qué se hizo:** se clonó esta rama en limpio (commit `b6eb4c7`) y se siguieron los pasos de arriba en el contenedor donde se hizo el video original.
+- Node 22.22.0, numpy 2.5.3, scipy 1.18.1, ffmpeg 6.1.1.
+- Chromium headless shell 1194.
+
+**Resultado:** los tres archivos salieron **idénticos byte a byte** a los del 2026-10-14.
+
+| Archivo | sha256 (original y reproducido) |
+|---|---|
+| `public/music.wav` | `ec3c9bcbbaf5647e155b3fc29c53acaa277dd60f6efb696ec864432dbc7f95de` |
+| `out/inmobot-raw.mp4` | `ae3f4cfcd4cdd1d0b955c3f032e732246bf8e9a5b5ecd096ddf0039acd322929` |
+| `out/InmoBot-Sofia-demo.mp4` (el que se entregó) | `d08c0b8d6abfe9a6ca2c015e6cfd68740858c1222404341c69b66f06ef2ef6ea` |
+
+- Con `ffmpeg -f framemd5` también coinciden, uno por uno, los 1530 frames de video y los 2391 paquetes de audio decodificados.
+- Duración: 51.008 s.
+- El proceso completo tardó unos 3.5 minutos.
+
+**No verificado:** reproducirlo en otra máquina, por ejemplo macOS. Con otras fuentes, otro navegador u otra versión de ffmpeg, el archivo puede no salir idéntico.
 
 ## Honestidad: qué muestra el video
 - **Mensajes:** los del prospecto y las respuestas de Sofía son reales. Vienen del escenario `lead_visita_whatsapp` de la corrida 6 de `live-smoke` (`7be5400`, Gemini). Las respuestas largas están abreviadas con "…".
