@@ -1,0 +1,1 @@
+Sofía · InmoBot: un agente inmobiliario con tool use que califica prospectos, muestra solo propiedades del catálogo, registra visitas y pasa a un humano por WhatsApp (demo con catálogo ficticio). Lo probé contra Gemini real: 3 de 6 corridas fallaron, y cada falla tuvo diagnóstico, corrección y prueba de regresión. Código, spec y bitácora: github.com/astraDukoWave/inmobot-demo

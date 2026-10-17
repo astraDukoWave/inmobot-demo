@@ -1,0 +1,23 @@
+{
+  "name": "inmobot-video",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Video de presentación de InmoBot · Sofía (Remotion, 51 s, 1920×1080).",
+  "license": "MIT",
+  "scripts": {
+    "music": "mkdir -p public && python3 make_music.py public/music.wav",
+    "stills": "node stills.mjs",
+    "render": "node render.mjs",
+    "finish": "bash finish.sh"
+  },
+  "dependencies": {
+    "@remotion/bundler": "^4.0.535",
+    "@remotion/cli": "^4.0.535",
+    "@remotion/renderer": "^4.0.535",
+    "@types/react": "^18.3.12",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "^4.0.535",
+    "typescript": "^5.6.3"
+  }
+}
