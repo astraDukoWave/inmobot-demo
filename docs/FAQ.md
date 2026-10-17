@@ -18,7 +18,7 @@ Con tool use, el modelo pide una función con argumentos validados por un JSON S
 - **Límite honesto:** el texto libre del modelo todavía puede equivocarse. Lo medimos con revisión humana de las respuestas, no con una métrica automática.
 
 ## 3. ¿Cuánto cuesta una conversación?
-Una conversación medida de 5 turnos con `gemini-3.8-flash` (live-smoke 6) usó ~18,450 tokens de entrada y ~450 de salida. Eso es ≈ **$0.016 USD ≈ 0.3 MXN**.
+Una conversación medida de 5 turnos con `gemini-3.8-flash` (live-smoke 6) usó ~18,450 tokens de entrada y ~450 de salida. Con el precio de lista, eso se **estima** en ≈ **$0.016 USD ≈ 0.3 MXN**, con un tipo de cambio supuesto de 18.5. Es el consumo del modelo; no incluye hosting.
 - **Precios:** $0.75 por millón de tokens de entrada y $3.75 por millón de salida, vigentes hasta el 31-dic-2026.
 - El costo crece con la longitud del historial, que está acotado a 12 turnos.
 - `/api/admin/usage` da los tokens reales del proceso.

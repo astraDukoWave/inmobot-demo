@@ -52,7 +52,7 @@ Las tools solo pueden tocar el lead de la sesión que las llama.
 
 ## Evidencia de calidad
 - **CI en cada PR:** `ruff` + **88 pruebas** con un LLM falso, sin red ni keys (`tests/`).
-- **Prueba contra el modelo real** (`live-smoke`, manual): 3 escenarios críticos. La corrida sobre el código mergeado **pasó 3/3**, con 3.0–5.7 s por turno y ≈0.34 MXN.
+- **Prueba contra el modelo real** (`live-smoke`, manual): 3 escenarios críticos. La corrida sobre el código mergeado **pasó 3/3**, con 3.0–5.7 s por turno y un costo estimado de ≈0.34 MXN por toda la corrida.
   - Fueron 6 corridas en total, 3 de ellas fallidas. Cada falla, su causa y su corrección están en [`docs/reviews/INMOBOT_S01_LIVE-SMOKE_LOG.md`](docs/reviews/INMOBOT_S01_LIVE-SMOKE_LOG.md).
 - **Revisión independiente** del PR del agente, hecha por un subagente con contexto fresco. Hallazgos H1–H7, corregidos o registrados en el backlog.
 - **Verify Report** contra el spec aprobado, requisito por requisito: [`docs/reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md`](docs/reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md).
@@ -78,13 +78,13 @@ Las tools solo pueden tocar el lead de la sesión que las llama.
 ## Límites conocidos
 - **Datos:** SQLite vive en el disco efímero del dyno y se borra en cada deploy o reinicio. Solo sirve para la demo con datos de prueba; el siguiente paso sería Postgres (LB-01).
 - **Costo:**
-  - Una conversación de 5 turnos midió ~18–20 mil tokens de entrada, ≈0.3 MXN.
+  - Una conversación de 5 turnos midió ~18–20 mil tokens de entrada. Su consumo del modelo se **estima** en ≈0.3 MXN, con el precio de lista y un tipo de cambio supuesto de 18.5.
   - `DAILY_TOKEN_BUDGET` da una **estimación** de ≈12 MXN/día, **no un máximo garantizado**: el contador vive en memoria, vuelve a cero con cada reinicio y no cuenta las llamadas abandonadas por timeout.
   - El límite real es el spend cap mensual del proyecto en AI Studio.
 - **Tiempo:** el límite de ~20 s cuenta desde que la app recibe la petición. No incluye la cola del router de Heroku.
 - **Concurrencia:** un solo proceso. Sesiones y rate limit viven en memoria; para más de un dyno harían falta en Redis (LB-02).
 - **Calidad sin medir:**
-  - Latencia p95: la muestra es chica; el máximo observado fue 9.8 s.
+  - Latencia p95 de la versión actual: la corrida final midió 3.0–5.7 s en 6 turnos, muy pocos para un p95. El máximo de 9.8 s fue de una versión anterior (corrida 4).
   - La resistencia general del modelo a injection *indirecta* (LB-12).
   - El rechazo de temas ajenos contra el modelo real.
 - **Pospuesto en este ciclo:** circuit breaker (LB-10), servidor MCP y suite de evals.
