@@ -28,6 +28,7 @@ flowchart LR
 | Gate de deploy | cto-review | [`docs/reviews/INMOBOT_S01_CTO-REVIEW_G-DEPLOY-01.md`](reviews/INMOBOT_S01_CTO-REVIEW_G-DEPLOY-01.md) |
 | CS-3 · documentación | — | [PR #4](https://github.com/astraDukoWave/inmobot-demo/pull/4) (README, DEMO, FAQ y este documento) |
 | Incidente en producción | — | [`docs/reviews/INMOBOT_S01_INCIDENT-01_GEMINI-400.md`](reviews/INMOBOT_S01_INCIDENT-01_GEMINI-400.md): key con caracteres extra → 400. Diagnóstico sin exponer la key, corrección sin cambiar código y validación desde el celular |
+| Cierre del ciclo | — | [`docs/reviews/INMOBOT_S01_CLOSEOUT_v1.0.md`](reviews/INMOBOT_S01_CLOSEOUT_v1.0.md): cada punto del DoD con su estado y su evidencia, las excepciones aceptadas y la revisión de métricas del 17-oct |
 
 ## Gates humanos (lo que solo decide una persona)
 - **Spec:** aprobado con 8 ajustes.
@@ -46,7 +47,7 @@ flowchart LR
 |---|---|---|
 | DV-01 | El PR #1 se mergeó sin CI, porque el CI nacía en CS-1 | ratify-with-reason (solo PR #1) |
 | DV-02 | La skill `verify` solo la puede invocar el usuario | Sustitución aprobada: verify manual documentado contra el spec |
-| Time-box | El checkpoint de las 00:30 no se cumplió (sin deploy ni prueba en el celular) | Servidor MCP y suite de evals cancelados en este ciclo, por la regla fijada de antemano |
+| Time-box | El checkpoint de las 00:30 no se cumplió (sin deploy ni prueba en el celular) | Servidor MCP y suite de evals **diferidos, no construidos**, por la regla fijada de antemano. Evals → S02 (propuesto); MCP → S03 |
 
 ## Convenciones
 - **Etiquetas de evidencia:**
