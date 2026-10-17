@@ -26,7 +26,8 @@ flowchart LR
 | Verify | verify (manual, DV-02) | [`docs/reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md`](reviews/INMOBOT_S01_VERIFY-REPORT_PR2_v1.1.md) |
 | CS-2 · deploy | — | [PR #3](https://github.com/astraDukoWave/inmobot-demo/pull/3) + [`docs/DEPLOY.md`](DEPLOY.md) |
 | Gate de deploy | cto-review | [`docs/reviews/INMOBOT_S01_CTO-REVIEW_G-DEPLOY-01.md`](reviews/INMOBOT_S01_CTO-REVIEW_G-DEPLOY-01.md) |
-| CS-3 · documentación | — | PR #4 (este README, DEMO, FAQ y este documento) |
+| CS-3 · documentación | — | [PR #4](https://github.com/astraDukoWave/inmobot-demo/pull/4) (README, DEMO, FAQ y este documento) |
+| Incidente en producción | — | [`docs/reviews/INMOBOT_S01_INCIDENT-01_GEMINI-400.md`](reviews/INMOBOT_S01_INCIDENT-01_GEMINI-400.md): key con caracteres extra → 400. Diagnóstico sin exponer la key, corrección sin cambiar código y validación desde el celular |
 
 ## Gates humanos (lo que solo decide una persona)
 - **Spec:** aprobado con 8 ajustes.

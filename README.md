@@ -92,13 +92,18 @@ Las tools solo pueden tocar el lead de la sesión que las llama.
 ## Correr local
 Requiere Python ≥ 3.10.
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-pytest -q && ruff check .                                   # sin red ni keys
-cp .env.example .env                                        # pon tu GEMINI_API_KEY
-uvicorn app.main:create_app --factory --env-file .env --port 8000
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest -q
+.venv/bin/ruff check .
+cp .env.example .env
 ```
-- Sin key, corre con un LLM guionado: `LLM_PROVIDER=fake uvicorn app.main:create_app --factory`.
+- Las pruebas y el lint corren sin red ni keys.
+- Pon tu `GEMINI_API_KEY` en `.env` y arranca:
+  ```bash
+  .venv/bin/uvicorn app.main:create_app --factory --env-file .env --port 8000
+  ```
+- Sin key, corre con un LLM guionado: `LLM_PROVIDER=fake .venv/bin/uvicorn app.main:create_app --factory`.
 - Deploy en Heroku (contenedor + `heroku.yml`): ver [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ## Cómo se construyó

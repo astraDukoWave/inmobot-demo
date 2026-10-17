@@ -7,11 +7,11 @@
   - PR #1 (docs) → `7555332`.
   - PR #2 (agente, verificado sobre `7be5400`) → `d74b514`.
   - PR #3 (contenedor y runbook) → `dcce6ff`.
-- **En curso:** PR #4 (CS-3: README honesto, LICENSE, DEMO, FAQ, WORKFLOW y reviews).
-- **Evidencia:** `docs/reviews/` contiene la línea base, la revisión independiente, la bitácora de live-smoke, el Verify Report y el cto-review.
+  - PR #4 (CS-3, documentación) → `1d75dd3`.
+- **Producción:** Heroku `inmobot-sofia`, dyno Basic, release del código `dcce6ff`. Jonathan lo validó desde el celular el 2026-10-14, después del incidente 01 (key con caracteres extra, corregida sin cambiar código).
+- **Evidencia:** `docs/reviews/` contiene la línea base, la revisión independiente, la bitácora de live-smoke, el Verify Report, el cto-review y el incidente 01.
 
 ## Pendiente (humano)
-- Deploy en Heroku y prueba en el celular, siguiendo `docs/DEPLOY.md` (pasos 1–6).
 - Spend cap mensual en AI Studio y alerta de presupuesto en Google Cloud.
 - Grabar el video de respaldo de 2 minutos (`docs/DEMO.md`, plan B).
 - Después de la demostración: `heroku config:unset WHATSAPP_NUMBER`, y apagar o bajar el tope si ya no se usa.
